@@ -1,0 +1,17 @@
+mhipex-env/
+__pycache__/
+*.pyc
+data/
+proc/
+out/
+out_kg/
+*.pdf
+!MHIPEX_Paper_Final_v3.pdf
+!MHIPEX_Full_Blueprint.pdf
+!full project nit k .pdf
+!Comments.pdf
+.vscode/
+.idea/
+.ipynb_checkpoints/
+experiments/
+mhipex_v12_results/

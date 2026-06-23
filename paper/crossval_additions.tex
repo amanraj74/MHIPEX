@@ -1,0 +1,98 @@
+% ══════════════════════════════════════════════════════════════════
+%  PAPER ADDITIONS — Paste these into main.tex after experiments
+%  Replace [X.XXXX] placeholders with actual results from Kaggle
+% ══════════════════════════════════════════════════════════════════
+
+% ─────────────────────────────────────────────────────────────────
+% ADD THIS AFTER Section 7 (Ablation Study), BEFORE Section 8 (Error Analysis)
+% Renumber Error Analysis to Section 9, Discussion to 10, Conclusion to 11
+% ─────────────────────────────────────────────────────────────────
+
+%================================================================
+\section{Cross-Dataset Validation}
+\label{sec:crossval}
+%================================================================
+
+A key concern with any supervised system is whether it generalises beyond the specific data distribution on which it was trained. To investigate this, we conduct two types of cross-dataset experiments using only hmBERT (our strongest single model): \emph{domain transfer} across data sources and \emph{cross-lingual transfer} across languages.
+
+\subsection{Domain Transfer}
+
+The HIPE-2026 organisers provide two data sources drawn from different newspaper archives: the \emph{sandbox} (used for all preceding experiments) and the \emph{newspaper v1.0} collection. While both contain the same relation types and languages, the underlying articles originate from different digitisation projects and time periods, introducing distributional shifts in OCR quality, writing style, and topic coverage.
+
+We train hmBERT on the full sandbox training set (6,170 pairs) and evaluate on the newspaper v1.0 data (1,251 pairs). Table~\ref{tab:crossval} reports the results.
+
+\subsection{Cross-Lingual Zero-Shot Transfer}
+
+To assess the model's ability to generalise across languages, we conduct leave-one-language-out experiments: training on two languages and evaluating on the held-out third. This simulates a realistic scenario where annotated data exists for some languages but not others.
+
+\begin{table}[t]
+\centering
+\caption{Cross-dataset and cross-lingual validation results. All experiments use hmBERT with enriched v12 input. ``Reference'' denotes the standard sandbox train/dev configuration.}
+\label{tab:crossval}
+\begin{tabular}{llccc}
+\toprule
+\textbf{Experiment} & \textbf{Test data} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
+\midrule
+Reference & Sandbox dev & 0.553 & 0.450 & 0.655 \\
+\midrule
+C1: Domain transfer & Newspaper v1.0 & [X.XXX] & [X.XXX] & [X.XXX] \\
+C2: Zero-shot EN & Sandbox EN dev & [X.XXX] & [X.XXX] & [X.XXX] \\
+C3: Zero-shot FR & Sandbox FR dev & [X.XXX] & [X.XXX] & [X.XXX] \\
+C4: Zero-shot DE & Sandbox DE dev & [X.XXX] & [X.XXX] & [X.XXX] \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ─────────────────────────────────────────────────────────────────
+% DISCUSSION TEXT (adjust based on actual results)
+% ─────────────────────────────────────────────────────────────────
+% If C1 MR is close to Reference (~0.50+):
+%   "The domain transfer result (MR=[X.XXX]) demonstrates reasonable
+%    generalisation to unseen newspaper sources, with a moderate
+%    degradation of [X] points compared to in-domain evaluation."
+%
+% If C1 MR is much lower (<0.45):
+%   "The domain transfer result reveals a significant gap between
+%    sandbox and newspaper data, suggesting that OCR quality and
+%    topical coverage differ substantially between sources."
+%
+% For cross-lingual: compare C2/C3/C4 to the per-language results
+% from Table 5 (EN=0.543, FR=0.568, DE=0.542)
+% ─────────────────────────────────────────────────────────────────
+
+
+% ─────────────────────────────────────────────────────────────────
+% ADD THIS PARAGRAPH TO Section 6 (Results), after the Per-Language
+% subsection. This is the SOTA POSITIONING paragraph.
+% ─────────────────────────────────────────────────────────────────
+
+\subsection{Positioning Against Prior Work}
+
+HIPE-2026 is the inaugural edition of the person--place relation extraction task within the CLEF evaluation framework. Unlike HIPE-2020 and HIPE-2022, which addressed named entity recognition and linking, this edition introduces a fundamentally new task formulation with no directly comparable prior results. Our baselines---mBERT, hmBERT, and XLM-R---represent the three standard paradigms for multilingual historical NLP: general-purpose multilingual pretraining, domain-specific historical pretraining, and large-scale cross-lingual pretraining. These are the same models that dominated the leaderboards in HIPE-2022~\cite{schweter2022,ehrmann2022}, establishing them as the strongest available reference points for this new task.
+
+The consistent advantage of hmBERT over XLM-R (0.553 vs. 0.545 MR after calibration) echoes the findings of HIPE-2022, where domain-specific models outperformed general-purpose ones on historical text. However, the magnitude of the gap is smaller here than for NER, suggesting that relation extraction may benefit more from the broader world knowledge encoded in XLM-R's larger pretraining corpus.
+
+
+% ─────────────────────────────────────────────────────────────────
+% ADD THIS to the ABSTRACT (replace existing abstract)
+% Updated to mention cross-dataset validation
+% ─────────────────────────────────────────────────────────────────
+
+% \begin{abstract}
+% This paper describes our participation in the CLEF HIPE-2026 shared task on person--place relation extraction from multilingual historical newspapers. We present MHIPEX, a system that combines two complementary transformer encoders---a historically pre-trained multilingual BERT (hmBERT) and XLM-RoBERTa---into a weighted soft-voting ensemble. Our pipeline introduces enriched input representations embedding publication date and source language, multi-sample dropout with dual pooling, class-weighted loss, and post-hoc threshold calibration. On the HIPE-2026 sandbox development data, MHIPEX achieves a macro-recall of 0.5655, a +32.5\% relative improvement over a vanilla mBERT baseline. We provide ablation studies, cross-dataset validation across data sources and languages, and per-language error analysis across English, French, and German.
+% \end{abstract}
+
+
+% ─────────────────────────────────────────────────────────────────
+% ADD THESE REFERENCES to the bibliography
+% ─────────────────────────────────────────────────────────────────
+
+% \bibitem{he2021}
+% He, P., Liu, X., Gao, J., Chen, W.:
+% DeBERTa: Decoding-enhanced BERT with Disentangled Attention.
+% In: Proceedings of ICLR 2021 (2021)
+
+% \bibitem{pires2019}
+% Pires, T., Schlinger, E., Garrette, D.:
+% How Multilingual is Multilingual BERT?
+% In: Proceedings of ACL 2019, pp.~4996--5001. ACL (2019)

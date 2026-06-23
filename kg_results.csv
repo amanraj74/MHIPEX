@@ -1,0 +1,5 @@
+Experiment,MR,at_recall,isAt_recall
+E0_text_only,0.534,,
+E1_text_kg,0.5425,,
+E0: Text-only,0.5527,0.4555,0.6499
+E1: Text + KG,0.5529,0.4713,0.6344

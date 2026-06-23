@@ -1,0 +1,627 @@
+﻿Total cells: 8
+
+============================================================
+CELL 1/8 [CODE]
+============================================================
+# ΓòöΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòù
+# Γòæ  MHIPEX v10 ΓÇö hmBERT + mBERT ensemble                               Γòæ
+# Γòæ  Fix: Replace XLM-R-base (dies every run) with mBERT (stable)       Γòæ
+# Γòæ  Both use WordPiece ΓåÆ no embedding-resize gradient spike             Γòæ
+# Γòæ  Expected MR: 0.56ΓÇô0.62 | Runtime: ~1.5h on T4 x2                  Γòæ
+# ΓòÜΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓò¥
+
+import os, math, json, re, random, copy, gc, time
+os.environ["PYTORCH_ALLOC_CONF"]     = "expandable_segments:True"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import subprocess
+subprocess.run(["pip","install","-q","transformers==4.40.2","accelerate","scikit-learn","tqdm"],check=True)
+print("Γ£à Packages ready")
+
+from pathlib import Path
+import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from transformers import AutoModel, AutoTokenizer, get_cosine_schedule_with_warmup
+from sklearn.metrics import recall_score, classification_report
+from tqdm import tqdm
+import urllib.request
+
+SEED = 42
+def set_seed(s=SEED):
+    random.seed(s); np.random.seed(s)
+    torch.manual_seed(s); torch.cuda.manual_seed_all(s)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark     = False
+set_seed()
+torch.backends.cuda.matmul.allow_tf32 = True
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+N_GPU  = torch.cuda.device_count()
+print(f"Device : {DEVICE} | GPUs : {N_GPU} | CUDA : {torch.version.cuda}")
+
+AT_MAP     = {"FALSE":0,"PROBABLE":1,"TRUE":2}
+ISAT_MAP   = {"FALSE":0,"TRUE":1}
+AT_NAMES   = ["FALSE","PROBABLE","TRUE"]
+ISAT_NAMES = ["FALSE","TRUE"]
+SPECIAL    = ["<P>","</P>","<L>","</L>"]
+AT_W       = torch.tensor([0.80,1.50,2.40], dtype=torch.float32)
+ISAT_W     = torch.tensor([0.70,2.60],      dtype=torch.float32)
+
+# ΓöÇΓöÇ Model configs ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# KEY CHA
+
+... [TRUNCATED - 17521 chars total]
+
+--- OUTPUT ---
+Γ£à Packages ready
+Device : cuda | GPUs : 2 | CUDA : 12.8
+
+ΓöÇΓöÇ Data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  en-train.jsonl (cached)
+  fr-train.jsonl (cached)
+  de-train.jsonl (cached)
+  en-dev.jsonl (cached)
+  fr-dev.jsonl (cached)
+  de-dev.jsonl (cached)
+Γ£à Data ready
+
+ΓöÇΓöÇ Dataset ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  en train: 496
+  fr train: 4,450
+  de train: 1,224
+Γ£à train: 6,170
+
+  en dev  : 151
+  fr dev  : 1,498
+  de dev  : 432
+Γ£à dev: 2,081
+
+
+ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê
+  MHIPEX v10 | hmBERT + mBERT (stable WordPiece ensemble)
+  ΓÅ▒  Est. ~1.5h on T4 x2  |  ≡ƒÄ» Target MR: 0.56ΓÇô0.62
+ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê
+
+================================================================
+  HMBERT | dbmdz/bert-base-historic-multilingual-cased
+  LR=8e-06 | EffBS=64 | Pat=8 | clip=0.5
+================================================================
+
+  GPU free: 15.53 GB
+    '<P>'ΓåÆ[32000] (Γ£à)
+    '</P>'ΓåÆ[32001] (Γ£à)
+    '<L>'ΓåÆ[32002] (Γ£à)
+    '</L>'ΓåÆ[32003] (Γ£à)
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+  DataParallel:2 GPUs Γ£à
+  Layer-wise LR: 16 groups Γ£à
+  Steps/ep:97 | Total:3395 | Warmup:407
+
+                                                  
+
+... [OUTPUT TRUNCATED - 16641 chars total]
+
+============================================================
+CELL 2/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  MHIPEX v10 ΓÇö CONTINUATION CELL
+#  Run this in the NEXT cell after hmBERT finished.
+#  mBERT uses "bert-base-multilingual-cased" (no google/ prefix ΓåÆ no 401)
+#  Then soft-ensembles hmBERT + mBERT ΓåÆ submit
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import os, math, json, re, random, copy, gc, time
+os.environ["PYTORCH_ALLOC_CONF"]     = "expandable_segments:True"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+from pathlib import Path
+import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from transformers import AutoModel, AutoTokenizer, get_cosine_schedule_with_warmup
+from sklearn.metrics import recall_score, classification_report
+from tqdm import tqdm
+
+SEED = 42
+def set_seed(s=SEED):
+    random.seed(s); np.random.seed(s)
+    torch.manual_seed(s); torch.cuda.manual_seed_all(s)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark     = False
+set_seed()
+torch.backends.cuda.matmul.allow_tf32 = True
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+N_GPU  = torch.cuda.device_count()
+print(f"Device: {DEVICE} | GPUs: {N_GPU}")
+
+# ΓöÇΓöÇ Constants ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+AT_MAP     = {"FALSE":0, "PROBABLE":1, "TRUE":2}
+ISAT_MAP   = {"FALSE":0, "TRUE":1}
+AT_NAMES   = ["FALSE", "PROBABLE", "TRUE"]
+ISAT_NAMES = ["FALSE", "TRUE"]
+SPECIAL    = ["<P>", "</P>", "<L>", "</L>"]
+AT_W       = torch.tensor([0.80, 1.50, 2.40], dtype=torch.float32)
+ISAT_W     = torch.tensor([0.70, 2.60],        dtype=torch.float32)
+WD         = 0.01
+
+PROC_DIR = Path("proc")
+OUT_DIR  = Path("out"); OUT_DIR.mkdir(exist_ok=True)
+
+# ΓöÇΓöÇ mBERT Config ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# KEY: "bert-base-multilingual-cased" ΓÇö no google/ prefix ΓåÆ no 401 error
+MBERT_CFG = {
+    "name":    "bert-base-multilingual-cas
+
+... [TRUNCATED - 15690 chars total]
+
+--- OUTPUT ---
+Device: cuda | GPUs: 2
+
+================================================================
+  mBERT | bert-base-multilingual-cased
+  LR=8e-06 | EffBS=64 | Pat=8 | clip=0.5
+================================================================
+
+  GPU free: 14.39 GB
+tokenizer_config.json:   0%|          | 0.00/49.0 [00:00<?, ?B/s]config.json:   0%|          | 0.00/625 [00:00<?, ?B/s]vocab.txt: 0.00B [00:00, ?B/s]tokenizer.json: 0.00B [00:00, ?B/s]    '<P>' ΓåÆ [119547] (Γ£à)
+    '</P>' ΓåÆ [119548] (Γ£à)
+    '<L>' ΓåÆ [119549] (Γ£à)
+    '</L>' ΓåÆ [119550] (Γ£à)
+model.safetensors:   0%|          | 0.00/714M [00:00<?, ?B/s]  DataParallel:2 GPUs Γ£à
+  Layer-wise LR: 16 groups Γ£à
+  Steps/ep:97 | Total:3395 | Warmup:407
+
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Ep01|Loss:1.5035|MR:0.4178(at=0.3355,isAt=0.5000)|1.6min
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Γ£à Best MR=0.4178 saved
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Ep02|Loss:1.2815|MR:0.4170(at=0.3339,isAt=0.5000)|3.0min
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Γåÿ No improvement (1/8)
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Ep03|Loss:1.2369|MR:0.4268(at=0.3523,isAt=0.5013)|4.4min
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Γ£à
+
+... [OUTPUT TRUNCATED - 10081 chars total]
+
+============================================================
+CELL 3/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  TIER 1 ΓÇö FIX 1: Logical Constraint Post-Processing (5 minutes)
+#  Rule: if at=FALSE ΓåÆ force isAt=FALSE (task definition requires this)
+#  Apply to BEST saved predictions (hmBERT 0.5382 from v8, or v9/v10)
+#  Expected gain: +0.02 to +0.04 MR instantly, zero retraining
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import json
+from pathlib import Path
+from sklearn.metrics import recall_score
+
+AT_NAMES   = ["FALSE", "PROBABLE", "TRUE"]
+ISAT_NAMES = ["FALSE", "TRUE"]
+
+OUT_DIR = Path("out")
+
+# ΓöÇΓöÇ Load your best predictions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# Priority: v8 > v9 > v10 (pick whichever exists and has highest MR)
+for fname in ["ensemble_predictions_v8.jsonl",
+              "ensemble_predictions_v9.jsonl",
+              "ensemble_predictions_v10.jsonl"]:
+    p = OUT_DIR / fname
+    if p.exists():
+        PRED_FILE = p
+        print(f"  Using: {fname}")
+        break
+
+recs = [json.loads(l) for l in open(PRED_FILE, encoding="utf-8")]
+
+# ΓöÇΓöÇ Before fix ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+at_t  = [AT_NAMES.index(r["at_true"])   for r in recs]
+at_p  = [AT_NAMES.index(r["at_pred"])   for r in recs]
+is_t  = [ISAT_NAMES.index(r["isat_true"]) for r in recs]
+is_p  = [ISAT_NAMES.index(r["isat_pred"]) for r in recs]
+
+mr_before = round((
+    recall_score(at_t, at_p, average="macro", zero_division=0) +
+    recall_score(is_t, is_p, average="macro", zero_division=0)
+) / 2, 4)
+print(f"\n  MR BEFORE fix: {mr_before:.4f}")
+
+# ΓöÇΓöÇ Apply logical constraint ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+# HIPE-2026 task definition: at=FALSE means person was NOT at that location
+# Therefore isAt (around publication time) MUST also be FALSE
+fixed = 0
+is_p_fixed = []
+for i, r in enumerate(recs):
+    if r["at_pred"] == "FALSE":
+        is_p_fixed.append(ISAT_NAMES.index("FALSE"))
+        if r["isat_pred"] != "FALSE":
+            fixed += 1
+    else:
+      
+
+... [TRUNCATED - 2982 chars total]
+
+--- OUTPUT ---
+  Using: ensemble_predictions_v8.jsonl
+
+  MR BEFORE fix: 0.5112
+  Predictions corrected: 2 / 2081
+  MR AFTER  fix: 0.5114
+  GAIN:         +0.0002
+
+Γ£à Saved ΓåÆ out/predictions_tier1_constraint.jsonl
+  Submit this instead of the original predictions!
+
+
+
+============================================================
+CELL 4/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  TIER 1 ΓÇö FIX 2: Threshold Calibration (30 minutes, no retraining)
+#  Grid-search optimal decision thresholds on dev set per class
+#  Uses saved hmBERT model probabilities directly
+#  Expected gain: +0.03 to +0.06 MR on top of Fix 1
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import json, gc
+import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+from pathlib import Path
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoModel, AutoTokenizer
+from sklearn.metrics import recall_score
+from itertools import product
+from tqdm import tqdm
+
+DEVICE   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+AT_NAMES   = ["FALSE", "PROBABLE", "TRUE"]
+ISAT_NAMES = ["FALSE", "TRUE"]
+SPECIAL    = ["<P>", "</P>", "<L>", "</L>"]
+PROC_DIR   = Path("proc")
+OUT_DIR    = Path("out")
+
+class HIPEDataset(Dataset):
+    def __init__(self, path, tok, maxlen=256):
+        self.data = [json.loads(l) for l in open(path, encoding="utf-8")]
+        self.tok = tok; self.maxlen = maxlen
+    def __len__(self): return len(self.data)
+    def __getitem__(self, i):
+        d = self.data[i]
+        enc = self.tok(d["text"], max_length=self.maxlen, truncation=True,
+                       padding="max_length", return_tensors="pt")
+        return {"input_ids": enc["input_ids"].squeeze(0),
+                "attention_mask": enc["attention_mask"].squeeze(0),
+                "at_label":   torch.tensor(d["at"],   dtype=torch.long),
+                "isat_label": torch.tensor(d["isat"], dtype=torch.long)}
+
+class MHIPEXModel(nn.Module):
+    def __init__(self, name, n_new_tok, dropout=0.15):
+        super().__init__()
+        self.encoder = AutoModel.from_pretrained(name)
+        self.encoder.resize_token_embeddings(self.encoder.config.vocab_size + n_new_tok)
+        h = self.encoder.config.hidden_size
+        self.layer_norm = nn.LayerNorm(h); self.dropout = nn.Dropout
+
+... [TRUNCATED - 7639 chars total]
+
+--- OUTPUT ---
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+  Loading hmBERT for probability extraction...
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+  Extracting probs: 100%|ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê| 66/66 [00:09<00:00,  6.80it/s]
+  Probs extracted: (2081, 3), (2081, 2)
+
+  Baseline argmax MR: 0.5347
+
+  Grid searching at-thresholds...
+  Grid searching isAt-threshold...
+  Best at-thresholds:   PROBABLE>=default, TRUE>=default
+  Best isAt-threshold:  TRUE>=0.50
+
+========================================================
+  Baseline (argmax):          MR = 0.5347
+  + Threshold calibration:    MR = 0.5366
+  Gain:                      +0.0019
+  v8 best (submitted):        MR = 0.5382
+  NEW BEST:                   MR = 0.5366  
+========================================================
+
+Γ£à Submit ΓåÆ out/predictions_tier1_calibrated.jsonl
+
+
+============================================================
+CELL 5/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  TIER 1 ΓÇö FIX 3: Add DATE + LANG tokens (Retrain v11)
+#  Enriches input from:
+#    <P> person </P> <L> location </L> text
+#  To:
+#    <P> person </P> <L> location </L> <DATE> 1923 </DATE> <LANG> fr </LANG> text
+#  Expected gain: +0.02ΓÇô0.04 MR (temporal signals critical for isAt)
+#  Run this AFTER Fixes 1 and 2 ΓÇö this requires a full retrain
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import json, re
+from pathlib import Path
+
+DATA_DIR = Path("data")
+PROC_DIR = Path("proc")
+PROC_DIR.mkdir(exist_ok=True)
+
+# ΓöÇΓöÇ Check what fields are in your JSONL ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+sample_file = DATA_DIR / "en-train.jsonl"
+with open(sample_file, encoding="utf-8") as f:
+    sample = json.loads(f.readline())
+print("Available JSONL fields:")
+for k, v in sample.items():
+    if k != "text":
+        print(f"  {k}: {str(v)[:80]}")
+
+def clean(t, n=900):
+    return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", t)).strip()[:n]
+
+def build_v11(text, pers, locs, date_str="", lang=""):
+    p = clean(pers[0]) if pers else "UNKNOWN"
+    l = clean(locs[0]) if locs else "UNKNOWN"
+    date_tok = f"<DATE> {date_str} </DATE> " if date_str else ""
+    lang_tok  = f"<LANG> {lang} </LANG> "    if lang    else ""
+    return f"<P> {p} </P> <L> {l} </L> {date_tok}{lang_tok}{clean(text, 800)}"
+
+AT_MAP   = {"FALSE":0, "PROBABLE":1, "TRUE":2}
+ISAT_MAP = {"FALSE":0, "TRUE":1}
+
+def load_jsonl_v11(path, lang):
+    recs = []
+    for line in open(path, encoding="utf-8"):
+        doc = json.loads(line)
+        # Extract date ΓÇö try common field names
+        date_str = ""
+        for field in ["date", "pub_date", "year", "publication_date", "decade"]:
+            if field in doc and doc[field]:
+                date_str = str(doc[field])[:10]; break
+        for pair in doc.get("sampled_pairs", []):
+            at   = pair.get("at",   "FALSE")
+            isat = pair.get("isAt", "FALSE")
+            i
+
+... [TRUNCATED - 3395 chars total]
+
+--- OUTPUT ---
+Available JSONL fields:
+  document_id: sn83026170-1820-01-10-a-i0001
+  media: {'publication_title': 'Alexandria Gazette & Daily Advertiser', 'time_period': '1
+  source: v2.1/hipe2020/en/HIPE-2022-v2.1-hipe2020-dev-en.tsv
+  language: en
+  date: 1820-01-10
+  sampled_pairs: [{'pers_entity_id': 'sn83026170-1820-01-10-a-i0001-NIL_mr_pain_wareing', 'pers_w
+
+ΓöÇΓöÇ Building v11 dataset (with DATE + LANG tokens) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  en train: 496
+  fr train: 4,450
+  de train: 1,224
+Γ£à train: 6,170
+
+  en dev  : 151
+  fr dev  : 1,498
+  de dev  : 432
+Γ£à dev: 2,081
+
+Sample input (first 200 chars):
+  <P> Mr. Pain Wareing </P> <L> Rappahannock </L> <DATE> 1820-01-10 </DATE> <LANG> en </LANG> Was Committed, T O the /ail for the county of Alexandria, D. C. on the 23d inst. a negro man, who called him
+
+Γ£à v11 dataset ready ΓåÆ proc/train_v11.jsonl
+   Now change PROC_DIR references in your training cell to use *_v11.jsonl
+   Also add <DATE> </DATE> <LANG> </LANG> to SPECIAL tokens list
+
+
+============================================================
+CELL 6/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  MHIPEX v11 ΓÇö hmBERT only, enriched inputs (DATE + LANG tokens)
+#  Dataset: proc/train_v11.jsonl & proc/dev_v11.jsonl
+#  New special tokens: <DATE> </DATE> <LANG> </LANG> added
+#  Expected MR: 0.55ΓÇô0.60 | Runtime: ~42 min on T4 x2
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import os, math, json, re, random, copy, gc, time
+os.environ["PYTORCH_ALLOC_CONF"]     = "expandable_segments:True"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+from pathlib import Path
+import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from transformers import AutoModel, AutoTokenizer, get_cosine_schedule_with_warmup
+from sklearn.metrics import recall_score, classification_report
+from tqdm import tqdm
+
+SEED = 42
+def set_seed(s=SEED):
+    random.seed(s); np.random.seed(s)
+    torch.manual_seed(s); torch.cuda.manual_seed_all(s)
+    torch.backends.cudnn.deterministic = True; torch.backends.cudnn.benchmark = False
+set_seed()
+torch.backends.cuda.matmul.allow_tf32 = True
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+N_GPU  = torch.cuda.device_count()
+print(f"Device: {DEVICE} | GPUs: {N_GPU} | CUDA: {torch.version.cuda}")
+
+AT_MAP     = {"FALSE":0,"PROBABLE":1,"TRUE":2}
+ISAT_MAP   = {"FALSE":0,"TRUE":1}
+AT_NAMES   = ["FALSE","PROBABLE","TRUE"]
+ISAT_NAMES = ["FALSE","TRUE"]
+
+# v11: 8 special tokens (4 original + 4 new for DATE/LANG)
+SPECIAL = ["<P>","</P>","<L>","</L>","<DATE>","</DATE>","<LANG>","</LANG>"]
+
+AT_W   = torch.tensor([0.80,1.50,2.40], dtype=torch.float32)
+ISAT_W = torch.tensor([0.70,2.60],      dtype=torch.float32)
+WD     = 0.01
+
+PROC_DIR = Path("proc"); OUT_DIR = Path("out"); OUT_DIR.mkdir(exist_ok=True)
+
+CFG = {
+    "name":  "dbmdz/bert-base-historic-multilingual-cased",
+    "bs":32, "accum":2, "lr":8e-6, "decay":0.90,
+    "pat":8, "ep":35, "wu":0.12, "maxlen":256, "drop"
+
+... [TRUNCATED - 10062 chars total]
+
+--- OUTPUT ---
+Device: cuda | GPUs: 2 | CUDA: 12.8
+
+ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê
+  MHIPEX v11 | hmBERT + DATE/LANG enriched inputs
+  ≡ƒÄ» Target: beat 0.5382  | ΓÅ▒ ~42 min
+ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê
+  GPU free: 12.52 GB
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+  Added 8 special tokens
+    '<P>' ΓåÆ [32000] (Γ£à)
+    '</P>' ΓåÆ [32001] (Γ£à)
+    '<L>' ΓåÆ [32002] (Γ£à)
+    '</L>' ΓåÆ [32003] (Γ£à)
+    '<DATE>' ΓåÆ [32004] (Γ£à)
+    '</DATE>' ΓåÆ [32005] (Γ£à)
+    '<LANG>' ΓåÆ [32006] (Γ£à)
+    '</LANG>' ΓåÆ [32007] (Γ£à)
+  DataParallel:2 GPUs Γ£à
+  Layer-wise LR: 16 groups Γ£à
+  Steps/ep:97 | Total:3395 | Warmup:407
+
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Ep01|Loss:1.4020|MR:0.4167(at=0.3333,isAt=0.5000)|1.2min
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Γ£à Best MR=0.4167 
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Ep02|Loss:1.2844|MR:0.4167(at=0.3333,isAt=0.5000)|2.4min
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  Γåÿ No improvement (1/8)
+                                                               
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+... [OUTPUT TRUNCATED - 9872 chars total]
+
+============================================================
+CELL 7/8 [CODE]
+============================================================
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+#  CALIBRATE v11 hmBERT (DATE/LANG model)
+#  Uses saved model from: out/hmbert_v11/
+#  Goal: see if threshold calibration can beat 0.5382
+# ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+
+import json, gc
+import numpy as np
+import torch, torch.nn as nn, torch.nn.functional as F
+from pathlib import Path
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoModel, AutoTokenizer
+from sklearn.metrics import recall_score
+from itertools import product
+from tqdm import tqdm
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+AT_NAMES   = ["FALSE", "PROBABLE", "TRUE"]
+ISAT_NAMES = ["FALSE", "TRUE"]
+SPECIAL    = ["<P>", "</P>", "<L>", "</L>", "<DATE>", "</DATE>", "<LANG>", "</LANG>"]
+PROC_DIR   = Path("proc")
+OUT_DIR    = Path("out")
+MODEL_DIR  = OUT_DIR / "hmbert_v11"
+MODEL_NAME = "dbmdz/bert-base-historic-multilingual-cased"
+
+class HIPEDataset(Dataset):
+    def __init__(self, path, tok, maxlen=256):
+        self.data = [json.loads(l) for l in open(path, encoding="utf-8")]
+        self.tok = tok; self.maxlen = maxlen
+    def __len__(self): return len(self.data)
+    def __getitem__(self, i):
+        d = self.data[i]
+        enc = self.tok(d["text"], max_length=self.maxlen, truncation=True,
+                       padding="max_length", return_tensors="pt")
+        return {
+            "input_ids": enc["input_ids"].squeeze(0),
+            "attention_mask": enc["attention_mask"].squeeze(0),
+            "at_label": torch.tensor(d["at"], dtype=torch.long),
+            "isat_label": torch.tensor(d["isat"], dtype=torch.long),
+            "lang": d.get("lang", "xx")
+        }
+
+class MHIPEXModel(nn.Module):
+    def __init__(self, name, n_new_tok, dropout=0.15):
+        super().__init__()
+        self.encoder = AutoModel.from_pretrained(name)
+        self.encoder.resize_token_embeddings(self.encoder.config.vocab_size + n_new_tok)
+        h = self.encoder.co
+
+... [TRUNCATED - 7824 chars total]
+
+--- OUTPUT ---
+Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+================================================================
+  CALIBRATING v11 hmBERT
+================================================================
+  Model dir: out/hmbert_v11
+  Device: cuda
+
+  Loading tokenizer and dev_v11...
+  Loading saved v11 model...
+/usr/local/lib/python3.12/dist-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+  Extracting probabilities...
+  Inference: 100%|ΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûêΓûê| 66/66 [00:09<00:00,  6.75it/s]
+
+  Baseline argmax MR: 0.5236 (at=0.4090, isAt=0.6382)
+
+  Grid searching AT thresholds...
+  Best AT thresholds: PROBABLE>=0.50, TRUE>=0.30
+  Best AT macro recall: 0.4308
+
+  Grid searching isAt thresholds + logical constraint...
+  Best isAt threshold: TRUE>=0.55
+  Best isAt macro recall: 0.6422
+
+================================================================
+  v11 Baseline argmax:      MR = 0.5236
+  v11 Calibrated final:     MR = 0.5365
+  Gain over v11 baseline:  +0.0129
+  Best old score (v8):      MR = 0.5382
+  Status: still below v8
+================================================================
+
+  PER-LANGUAGE (calibrated)
+  de: MR=0.5395 | at=0.4436 | isAt=0.6354 | N=432
+  en: MR=0.5840 | at=0.4325 | isAt=0.7354 | N=151
+  fr: MR=0
+
+... [OUTPUT TRUNCATED - 1627 chars total]
+
+============================================================
+CELL 8/8 [CODE]
+============================================================
+

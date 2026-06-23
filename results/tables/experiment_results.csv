@@ -1,0 +1,7 @@
+Model,Type,MR,at_recall,isAt_recall
+mBERT (fine-tuned),Baseline,0.4268,0.3500,0.5000
+hmBERT v8,Fine-tuned,0.5382,0.4400,0.6400
+hmBERT v11 + DATE/LANG,Fine-tuned,0.5365,0.4308,0.6422
+XLM-R base (v12),Fine-tuned + enriched,0.5449,0.4472,0.6426
+hmBERT v12,Fine-tuned + enriched,0.5525,0.4503,0.6548
+MHIPEX Ensemble,Ensemble + calibration,0.5655,0.4586,0.6724

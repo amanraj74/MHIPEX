@@ -1,0 +1,478 @@
+"""
+MHIPEX — Knowledge-Graph Augmented Relation Extraction
+Run on Kaggle with GPU T4 x2 + Internet enabled
+Estimated runtime: ~60 minutes
+"""
+
+# ══════════════════════════════════════════════════════════════════
+#  CELL 1: Setup + Wikidata Retrieval
+# ══════════════════════════════════════════════════════════════════
+
+import json, os, time, requests, gc, warnings
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer, AutoModel, get_cosine_schedule_with_warmup
+from sklearn.metrics import recall_score, classification_report
+from pathlib import Path
+from itertools import product as iterproduct
+
+warnings.filterwarnings("ignore")
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {DEVICE}")
+
+# ── Paths ──
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+PROC_DIR = Path("proc")
+PROC_DIR.mkdir(exist_ok=True)
+OUT_DIR = Path("out_kg")
+OUT_DIR.mkdir(exist_ok=True)
+
+AT_NAMES = ["FALSE", "PROBABLE", "TRUE"]
+ISAT_NAMES = ["FALSE", "TRUE"]
+AT_MAP = {"FALSE": 0, "PROBABLE": 1, "TRUE": 2}
+ISAT_MAP = {"FALSE": 0, "TRUE": 1}
+
+# ══════════════════════════════════════════════════════════════════
+#  Data Download & V12 Preprocessing
+# ══════════════════════════════════════════════════════════════════
+import urllib.request
+import re
+
+BASE_URL = "https://raw.githubusercontent.com/hipe-eval/HIPE-2026-data/main/data/sandbox"
+FILES = {
+    "en-train": f"{BASE_URL}/en-train.jsonl", "fr-train": f"{BASE_URL}/fr-train.jsonl", "de-train": f"{BASE_URL}/de-train.jsonl",
+    "en-dev":   f"{BASE_URL}/en-dev.jsonl",   "fr-dev":   f"{BASE_URL}/fr-dev.jsonl",   "de-dev":   f"{BASE_URL}/de-dev.jsonl",
+}
+
+print("\n── Downloading Data ──")
+for name, url in FILES.items():
+    dst = DATA_DIR / f"{name}.jsonl"
+    if not dst.exists():
+        print(f"  Downloading {name}.jsonl ...")
+        urllib.request.urlretrieve(url, dst)
+
+def clean_text(t, max_chars=850):
+    return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", t)).strip()[:max_chars]
+
+def build_input_v12(text, pers_list, loc_list, date_str="", lang=""):
+    p = " ; ".join(clean_text(m, 100) for m in pers_list) if pers_list else "UNKNOWN"
+    l = " ; ".join(clean_text(m, 100) for m in loc_list)  if loc_list  else "UNKNOWN"
+    date_tok = f"<DATE> {date_str} </DATE> " if date_str else ""
+    lang_tok = f"<LANG> {lang} </LANG> "     if lang     else ""
+    return f"<P> {p} </P> <L> {l} </L> {date_tok}{lang_tok}{clean_text(text)}"
+
+def load_and_process(path, lang):
+    records = []
+    for line in open(path, encoding="utf-8"):
+        doc = json.loads(line)
+        date_str = str(doc.get("date", ""))[:10]
+        for pair in doc.get("sampled_pairs", []):
+            at_raw = pair.get("at", "FALSE")
+            isat_raw = pair.get("isAt", "FALSE")
+            if at_raw not in AT_MAP or isat_raw not in ISAT_MAP: continue
+            records.append({
+                "text": build_input_v12(doc["text"], pair["pers_mentions_list"], pair["loc_mentions_list"], date_str, lang),
+                "at_label": at_raw, "isat_label": isat_raw,
+                "pers_qid": pair.get("pers_wikidata_qid", pair.get("pers_qid", "")),
+                "loc_qid": pair.get("loc_wikidata_qid", pair.get("loc_qid", "")),
+                "lang": lang, "doc_id": doc["document_id"],
+            })
+    return records
+
+print("\n── Preprocessing V12 Format ──")
+for split in ["train", "dev"]:
+    out_path = PROC_DIR / f"{split}_v12.jsonl"
+    if not out_path.exists():
+        all_recs = []
+        for lang in ["en", "fr", "de"]:
+            all_recs.extend(load_and_process(DATA_DIR / f"{lang}-{split}.jsonl", lang))
+        with open(out_path, "w", encoding="utf-8") as f:
+            for r in all_recs: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"  Processed {split}: {len(all_recs)} pairs")
+
+# ══════════════════════════════════════════════════════════════════
+#  Wikidata Retrieval
+# ══════════════════════════════════════════════════════════════════
+
+WIKIDATA_API = "https://www.wikidata.org/wiki/Special:EntityData/{}.json"
+CACHE_FILE = OUT_DIR / "wikidata_cache.json"
+
+# Properties to retrieve
+PERSON_PROPS = {
+    "P19": "birthplace", "P20": "deathplace", "P551": "residence",
+    "P27": "country", "P106": "occupation", "P39": "position"
+}
+PLACE_PROPS = {
+    "P17": "country", "P131": "admin_region", "P625": "coordinates",
+    "P1566": "geonames_id"
+}
+
+def get_label(claims, lang="en"):
+    """Extract label from Wikidata entity."""
+    if isinstance(claims, dict):
+        labels = claims.get("labels", {})
+        for l in [lang, "en", "fr", "de"]:
+            if l in labels:
+                return labels[l].get("value", "")
+    return ""
+
+def get_claim_values(entity_data, prop_id, max_vals=2):
+    """Extract values for a property from Wikidata entity."""
+    claims = entity_data.get("claims", {})
+    if prop_id not in claims:
+        return []
+    values = []
+    for claim in claims[prop_id][:max_vals]:
+        ms = claim.get("mainsnak", {})
+        dv = ms.get("datavalue", {})
+        if dv.get("type") == "wikibase-entityid":
+            qid = dv["value"].get("id", "")
+            values.append(qid)
+        elif dv.get("type") == "globecoordinate":
+            lat = dv["value"].get("latitude", 0)
+            lon = dv["value"].get("longitude", 0)
+            values.append(f"{lat:.2f},{lon:.2f}")
+        elif dv.get("type") == "string":
+            values.append(dv["value"])
+    return values
+
+def fetch_wikidata(qid, cache):
+    """Fetch entity data from Wikidata with caching."""
+    if qid in cache:
+        return cache[qid]
+    try:
+        resp = requests.get(WIKIDATA_API.format(qid), timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            entity = data.get("entities", {}).get(qid, {})
+            label = get_label(entity)
+            result = {"label": label, "claims": {}}
+            # Get person properties
+            for pid, pname in {**PERSON_PROPS, **PLACE_PROPS}.items():
+                vals = get_claim_values(entity, pid)
+                if vals:
+                    result["claims"][pname] = vals
+            cache[qid] = result
+            return result
+    except Exception:
+        pass
+    cache[qid] = {"label": "", "claims": {}}
+    return cache[qid]
+
+def resolve_qid_labels(qids, cache):
+    """Resolve QID references to human-readable labels."""
+    labels = []
+    for qid in qids:
+        if qid.startswith("Q"):
+            info = fetch_wikidata(qid, cache)
+            if info["label"]:
+                labels.append(info["label"])
+        else:
+            labels.append(qid)
+    return labels
+
+def build_kg_string(pers_qid, loc_qid, cache):
+    """Build knowledge graph fact string for a person-place pair."""
+    facts = []
+    if pers_qid:
+        pdata = fetch_wikidata(pers_qid, cache)
+        if pdata["label"]:
+            for prop, vals in pdata["claims"].items():
+                resolved = resolve_qid_labels(vals, cache)
+                if resolved:
+                    facts.append(f"{prop}: {', '.join(resolved)}")
+    if loc_qid:
+        ldata = fetch_wikidata(loc_qid, cache)
+        if ldata["label"]:
+            for prop, vals in ldata["claims"].items():
+                resolved = resolve_qid_labels(vals, cache)
+                if resolved:
+                    facts.append(f"loc_{prop}: {', '.join(resolved)}")
+    if facts:
+        return " <WIKI> " + " | ".join(facts[:8]) + " </WIKI>"
+    return ""
+
+# ══════════════════════════════════════════════════════════════════
+#  Load and Augment Data
+# ══════════════════════════════════════════════════════════════════
+
+print("\n Loading data and retrieving Wikidata facts...")
+
+# Load cache if exists
+cache = {}
+if CACHE_FILE.exists():
+    cache = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+    print(f"  Loaded {len(cache)} cached entities")
+
+def load_and_augment(split):
+    path = PROC_DIR / f"{split}_v12.jsonl"
+    data = [json.loads(l) for l in open(path, encoding="utf-8")]
+
+    for i, d in enumerate(data):
+        pers_qid = d.get("pers_wikidata_qid", d.get("pers_qid", ""))
+        loc_qid = d.get("loc_wikidata_qid", d.get("loc_qid", ""))
+        kg_str = build_kg_string(pers_qid, loc_qid, cache)
+        d["kg_facts"] = kg_str
+        d["text_kg"] = d["text"] + kg_str  # Append KG facts to input
+        if (i + 1) % 200 == 0:
+            print(f"    {split}: {i+1}/{len(data)} pairs processed")
+            # Save cache periodically
+            CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+
+    # Final cache save
+    CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+
+    kg_count = sum(1 for d in data if d["kg_facts"])
+    print(f"  {split}: {len(data)} pairs, {kg_count} ({100*kg_count/len(data):.1f}%) with KG facts")
+    return data
+
+train_data = load_and_augment("train")
+dev_data = load_and_augment("dev")
+
+print(f"\n  Wikidata cache: {len(cache)} entities")
+print(f"  Example KG facts: {train_data[0].get('kg_facts', 'none')[:200]}")
+
+
+# ══════════════════════════════════════════════════════════════════
+#  CELL 2: Model + Training
+# ══════════════════════════════════════════════════════════════════
+
+# Maps are now defined globally at the top
+
+class HIPEDataset(Dataset):
+    def __init__(self, data, tokenizer, max_len=256, use_kg=True):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.max_len = max_len
+        self.use_kg = use_kg
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        d = self.data[idx]
+        text = d["text_kg"] if self.use_kg else d["text"]
+        enc = self.tokenizer(text, truncation=True, max_length=self.max_len,
+                           padding="max_length", return_tensors="pt")
+        return {
+            "input_ids": enc["input_ids"].squeeze(),
+            "attention_mask": enc["attention_mask"].squeeze(),
+            "at_label": AT_MAP[d["at_label"]],
+            "isat_label": ISAT_MAP[d["isat_label"]],
+        }
+
+class MHIPEXClassifier(nn.Module):
+    def __init__(self, model_name, n_at=3, n_isat=2, dropout=0.15, n_drops=3):
+        super().__init__()
+        self.encoder = AutoModel.from_pretrained(model_name)
+        h = self.encoder.config.hidden_size
+        self.n_drops = n_drops
+        self.dropouts = nn.ModuleList([nn.Dropout(dropout) for _ in range(n_drops)])
+        self.at_head = nn.Linear(h, n_at)
+        self.isat_head = nn.Linear(h, n_isat)
+
+    def forward(self, input_ids, attention_mask):
+        out = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        cls_out = out.last_hidden_state[:, 0]
+        mask = attention_mask.unsqueeze(-1).float()
+        mean_out = (out.last_hidden_state * mask).sum(1) / mask.sum(1).clamp(min=1)
+        h = 0.5 * cls_out + 0.5 * mean_out
+
+        at_logits_sum = torch.zeros(h.size(0), 3, device=h.device)
+        isat_logits_sum = torch.zeros(h.size(0), 2, device=h.device)
+        for drop in self.dropouts:
+            hd = drop(h)
+            at_logits_sum += self.at_head(hd)
+            isat_logits_sum += self.isat_head(hd)
+        return at_logits_sum / self.n_drops, isat_logits_sum / self.n_drops
+
+def train_model(model_name, train_data, dev_data, use_kg, tag, epochs=25, lr=8e-6, bs=16):
+    print(f"\n{'='*60}")
+    print(f"  Training: {tag} | KG={use_kg} | {model_name}")
+    print(f"{'='*60}")
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    # Add special tokens
+    special = ["<P>", "</P>", "<L>", "</L>", "<DATE>", "</DATE>", "<LANG>", "</LANG>"]
+    if use_kg:
+        special += ["<WIKI>", "</WIKI>"]
+    tokenizer.add_special_tokens({"additional_special_tokens": special})
+
+    model = MHIPEXClassifier(model_name).to(DEVICE)
+    model.encoder.resize_token_embeddings(len(tokenizer))
+
+    train_ds = HIPEDataset(train_data, tokenizer, use_kg=use_kg)
+    dev_ds = HIPEDataset(dev_data, tokenizer, use_kg=use_kg)
+    train_dl = DataLoader(train_ds, batch_size=bs, shuffle=True, num_workers=2)
+    dev_dl = DataLoader(dev_ds, batch_size=bs * 2, num_workers=2)
+
+    # Class weights
+    at_w = torch.tensor([0.80, 1.50, 2.40], device=DEVICE)
+    isat_w = torch.tensor([0.70, 2.60], device=DEVICE)
+    at_loss_fn = nn.CrossEntropyLoss(weight=at_w)
+    isat_loss_fn = nn.CrossEntropyLoss(weight=isat_w)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
+    total_steps = len(train_dl) * epochs
+    scheduler = get_cosine_schedule_with_warmup(optimizer, int(0.12 * total_steps), total_steps)
+
+    best_mr = 0
+    patience, max_patience = 0, 8
+
+    for epoch in range(epochs):
+        model.train()
+        total_loss = 0
+        for batch in train_dl:
+            ids = batch["input_ids"].to(DEVICE)
+            mask = batch["attention_mask"].to(DEVICE)
+            at_y = batch["at_label"].to(DEVICE)
+            isat_y = batch["isat_label"].to(DEVICE)
+
+            at_logits, isat_logits = model(ids, mask)
+            loss = at_loss_fn(at_logits, at_y) + isat_loss_fn(isat_logits, isat_y)
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            optimizer.step()
+            scheduler.step()
+            total_loss += loss.item()
+
+        # Evaluate
+        model.eval()
+        all_at_true, all_at_pred = [], []
+        all_is_true, all_is_pred = [], []
+        all_at_probs, all_is_probs = [], []
+
+        with torch.no_grad():
+            for batch in dev_dl:
+                ids = batch["input_ids"].to(DEVICE)
+                mask = batch["attention_mask"].to(DEVICE)
+                at_logits, isat_logits = model(ids, mask)
+                at_probs = torch.softmax(at_logits, dim=-1)
+                is_probs = torch.softmax(isat_logits, dim=-1)
+
+                all_at_true.extend(batch["at_label"].tolist())
+                all_at_pred.extend(at_probs.argmax(dim=-1).cpu().tolist())
+                all_is_true.extend(batch["isat_label"].tolist())
+                all_is_pred.extend(is_probs.argmax(dim=-1).cpu().tolist())
+                all_at_probs.extend(at_probs.cpu().numpy())
+                all_is_probs.extend(is_probs.cpu().numpy())
+
+        at_mr = recall_score(all_at_true, all_at_pred, average="macro", zero_division=0)
+        is_mr = recall_score(all_is_true, all_is_pred, average="macro", zero_division=0)
+        mr = round((at_mr + is_mr) / 2, 4)
+
+        print(f"  Epoch {epoch+1:2d} | Loss: {total_loss/len(train_dl):.4f} | MR: {mr:.4f} (at={at_mr:.4f}, isAt={is_mr:.4f})")
+
+        if mr > best_mr:
+            best_mr = mr
+            patience = 0
+            # Save best
+            save_dir = OUT_DIR / tag
+            save_dir.mkdir(exist_ok=True)
+            torch.save({
+                "probs_at": torch.tensor(np.array(all_at_probs)),
+                "probs_isat": torch.tensor(np.array(all_is_probs)),
+                "at_true": all_at_true, "is_true": all_is_true,
+                "at_pred": all_at_pred, "is_pred": all_is_pred,
+            }, save_dir / "best_probs.pt")
+        else:
+            patience += 1
+            if patience >= max_patience:
+                print(f"  Early stopping at epoch {epoch+1}")
+                break
+
+    print(f"  Best MR: {best_mr:.4f}")
+    del model, optimizer
+    gc.collect()
+    torch.cuda.empty_cache()
+    return best_mr
+
+# ══════════════════════════════════════════════════════════════════
+#  CELL 3: Run Experiments
+# ══════════════════════════════════════════════════════════════════
+
+MODEL = "dbmdz/bert-base-historic-multilingual-cased"
+results = {}
+
+# E0: Text-only baseline (no KG)
+mr0 = train_model(MODEL, train_data, dev_data, use_kg=False, tag="hmbert_textonly")
+results["E0_text_only"] = mr0
+
+# E1: Text + Wikidata KG
+mr1 = train_model(MODEL, train_data, dev_data, use_kg=True, tag="hmbert_kg")
+results["E1_text_kg"] = mr1
+
+# ══════════════════════════════════════════════════════════════════
+#  CELL 4: Calibration + Results
+# ══════════════════════════════════════════════════════════════════
+
+def calibrate(tag):
+    data = torch.load(OUT_DIR / tag / "best_probs.pt", weights_only=True)
+    probs_at = data["probs_at"].numpy()
+    probs_isat = data["probs_isat"].numpy()
+    at_true = data["at_true"]
+    is_true = data["is_true"]
+
+    best_mr, best_cfg = 0, {}
+    prob_range = np.arange(0.20, 0.55, 0.05)
+    best_at_mr, best_at_thresh, best_at_preds = 0, (0.5, 0.5), []
+
+    for t_prob, t_true in iterproduct(prob_range, prob_range):
+        preds = []
+        for p in probs_at:
+            if p[2] >= t_true: preds.append(2)
+            elif p[1] >= t_prob: preds.append(1)
+            else: preds.append(0)
+        mr = recall_score(at_true, preds, average="macro", zero_division=0)
+        if mr > best_at_mr:
+            best_at_mr, best_at_thresh, best_at_preds = mr, (t_prob, t_true), preds
+
+    best_isat_mr, best_isat_thresh = 0, 0.5
+    for t in np.arange(0.15, 0.60, 0.05):
+        preds = []
+        for i, p in enumerate(probs_isat):
+            if best_at_preds[i] == 0: preds.append(0)
+            elif p[1] >= t: preds.append(1)
+            else: preds.append(0)
+        mr = recall_score(is_true, preds, average="macro", zero_division=0)
+        if mr > best_isat_mr:
+            best_isat_mr, best_isat_thresh = mr, t
+
+    total_mr = round((best_at_mr + best_isat_mr) / 2, 4)
+    return {"mr": total_mr, "at_mr": round(best_at_mr, 4), "isat_mr": round(best_isat_mr, 4)}
+
+print("\n" + "=" * 64)
+print("  KNOWLEDGE GRAPH EXPERIMENT RESULTS")
+print("=" * 64)
+
+for tag, label in [("hmbert_textonly", "E0: Text-only"), ("hmbert_kg", "E1: Text + KG")]:
+    save_path = OUT_DIR / tag / "best_probs.pt"
+    if save_path.exists():
+        cal = calibrate(tag)
+        print(f"  {label:25s} | MR: {cal['mr']:.4f} | at: {cal['at_mr']:.4f} | isAt: {cal['isat_mr']:.4f}")
+        results[label] = cal
+    else:
+        print(f"  {label}: not found")
+
+# Save results as CSV
+import csv
+csv_path = OUT_DIR / "kg_results.csv"
+with open(csv_path, "w", newline="") as f:
+    w = csv.writer(f)
+    w.writerow(["Experiment", "MR", "at_recall", "isAt_recall"])
+    for label, cal in results.items():
+        if isinstance(cal, dict):
+            w.writerow([label, cal["mr"], cal["at_mr"], cal["isat_mr"]])
+        else:
+            w.writerow([label, cal, "", ""])
+
+print(f"\n  Results saved to: {csv_path}")
+print(f"\n  Download the 'out_kg/' folder from Kaggle output!")
+print(f"  Then share kg_results.csv with me to update the paper.")

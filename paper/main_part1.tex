@@ -1,0 +1,260 @@
+% MHIPEX: Multilingual Historical Person-Place Relation Extraction
+% CLEF 2026 Working Notes — LNCS Format
+\documentclass[runningheads]{llncs}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\begin{document}
+
+\title{MHIPEX: An Enriched Transformer Ensemble for\\Person--Place Relation Extraction from\\Multilingual Historical Newspapers}
+
+\author{[Aman Jaiswal]\inst{1} \and Sarika Jain\inst{1}}
+\authorrunning{[Jaiswal] and Jain}
+\institute{National Institute of Technology Kurukshetra, India\\
+\email{\{author, sarikajain\}@nitkkr.ac.in}}
+
+\maketitle
+
+\begin{abstract}
+This paper describes our participation in the CLEF HIPE-2026 shared task on person--place relation extraction from multilingual historical newspapers. We present MHIPEX, a system that combines two complementary transformer encoders---a historically pre-trained multilingual BERT (hmBERT) and XLM-RoBERTa---into a weighted soft-voting ensemble. Our pipeline introduces several enhancements over standard fine-tuning: (i)~enriched input representations that embed publication date and source language as explicit tokens, (ii)~multi-sample dropout with dual CLS+mean pooling for regularisation, (iii)~class-weighted training objectives to address severe label imbalance, and (iv)~post-hoc threshold calibration that optimises macro-recall directly on a held-out set. On the HIPE-2026 sandbox development data, MHIPEX achieves a macro-recall of 0.5655, representing a +32.5\% relative improvement over a vanilla mBERT baseline. We provide a detailed ablation study quantifying the contribution of each component and conduct per-language error analysis across English, French, and German.
+\end{abstract}
+
+\keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and CLEF HIPE-2026 \and Ensemble Learning}
+
+%================================================================
+\section{Introduction}
+\label{sec:intro}
+%================================================================
+
+Historical newspapers constitute one of the richest documentary sources for studying population movement, social networks, and geographical ties across centuries. Millions of pages have been digitised in recent decades, yet extracting structured knowledge from them remains a formidable challenge. Optical character recognition (OCR) introduces noise at the character level; archaic orthography and morphology differ substantially from the modern text on which most language models are pre-trained; and the sheer linguistic diversity of European newspaper archives demands systems that can operate across multiple languages simultaneously.
+
+The CLEF HIPE evaluation campaigns have driven sustained progress on information extraction from these sources. The inaugural HIPE-2020 edition~\cite{ehrmann2020} and its successor HIPE-2022~\cite{ehrmann2022} focused on named entity recognition and linking. HIPE-2026~\cite{opitz2026} marks a significant departure: rather than identifying \emph{which} entities appear in a document, participants must now determine the \emph{nature of the relationship} between a person and a place. Concretely, given a (person, location) pair and the newspaper article in which both are mentioned, the system must classify two relations:
+\begin{itemize}
+    \item \textbf{\texttt{at}}: Did this person ever reside at, travel to, or otherwise have a geographical connection to this place? (three-way: \textsc{false}, \textsc{probable}, \textsc{true})
+    \item \textbf{\texttt{isAt}}: Is this person located at this place around the time the article was published? (binary: \textsc{false}, \textsc{true})
+\end{itemize}
+
+This formulation poses difficulties that go well beyond standard relation classification. The \texttt{at} relation requires world knowledge---a person may have been born in a city mentioned only in passing---while \texttt{isAt} demands temporal reasoning grounded in the publication date. Both relations exhibit severe class imbalance: in the development data, only 12.0\% of pairs carry a \textsc{true} label for \texttt{at}, and a mere 8.4\% for \texttt{isAt}.
+
+In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textbf{I}nformation \textbf{P}erson-place \textbf{EX}traction), our participating system. We pursue four research questions:
+
+\begin{description}
+    \item[RQ1] Can multilingual transformer encoders effectively model person--place relations in noisy historical text?
+    \item[RQ2] Does enriching the input with explicit date and language tokens improve classification, particularly for the temporally grounded \texttt{isAt} relation?
+    \item[RQ3] Does combining historically and generally pre-trained encoders via ensemble learning yield complementary gains?
+    \item[RQ4] Which architectural and training choices contribute most to overall performance, and where do the remaining errors concentrate?
+\end{description}
+
+Our results show that MHIPEX achieves a macro-recall (MR) of 0.5655 on the development set, a substantial improvement over each individual baseline. Through ablation we find that the ensemble itself provides the single largest gain (+0.013~MR), while input enrichment and threshold calibration each contribute meaningful increments. Error analysis reveals that the three-way \texttt{at} classification---and in particular the \textsc{probable} class---remains the principal bottleneck.
+
+%================================================================
+\section{Related Work}
+\label{sec:related}
+%================================================================
+
+\subsection{Information Extraction from Historical Documents}
+
+The computational analysis of historical text has gained momentum over the past decade, driven by large-scale digitisation projects such as Impresso~\cite{romanello2020} and Europeana Newspapers. Early work focused on adapting NER systems to the unique challenges of historical language. Labusch et al.~\cite{labusch2019} demonstrated that BERT-based models could be successfully applied to German historical texts despite significant orthographic variation, achieving F1 scores above 0.80 on manually annotated corpora.
+
+The HIPE shared task series formalised this line of research into a competitive benchmark. HIPE-2020~\cite{ehrmann2020} attracted 13 teams and established that transformer-based systems consistently outperformed BiLSTM architectures on historical NER, provided sufficient training data was available. HIPE-2022~\cite{ehrmann2022} expanded the scope to include entity linking and introduced additional languages (Finnish, Swedish) alongside classical commentary texts, further testing the transferability of NER models across time periods and genres.
+
+A critical development from the HIPE-2022 campaign was the release of hmBERT~\cite{schweter2022}, a BERT model pre-trained on historical newspapers in German, English, French, Swedish, and Finnish. Schweter et al. showed that domain-specific pre-training on historical corpora yielded consistent improvements over general-purpose multilingual models for NER, establishing hmBERT as the de facto encoder for historical NLP tasks.
+
+\subsection{Relation Extraction with Transformers}
+
+Modern relation extraction broadly falls into two paradigms: pipeline approaches that first identify entities and then classify their relations, and joint models that perform both tasks simultaneously. For sentence-level RE, fine-tuning pre-trained transformers with entity marker tokens has proven highly effective~\cite{devlin2019}. Recent surveys~\cite{lyu2024} highlight that document-level RE remains significantly more challenging, as it requires cross-sentence reasoning and coreference resolution.
+
+The HIPE-2026 task occupies an interesting middle ground: entity pairs are pre-identified, but the relations depend on information scattered across the entire document and, for \texttt{at}, on external world knowledge not present in the text at all. This makes the task closer to a contextualised classification problem than to conventional RE, and motivates our choice of a dual-head classification architecture over more complex graph-based approaches.
+
+\subsection{Multilingual and Cross-lingual Models}
+
+Cross-lingual transfer learning has been transformed by large-scale multilingual pre-training. Multilingual BERT (mBERT)~\cite{devlin2019} demonstrated surprising zero-shot cross-lingual transfer, though with diminishing returns for typologically distant languages. XLM-RoBERTa~\cite{conneau2020} scaled this approach to 100 languages using over 2~TB of CommonCrawl data, substantially outperforming mBERT on benchmarks including NER and natural language inference.
+
+A persistent question in multilingual NLP is whether domain-specific models outperform larger general-purpose ones. For historical text, Schweter et al.~\cite{schweter2022} found that hmBERT (110M parameters) outperformed the much larger XLM-R (278M) on HIPE-2022 NER, suggesting that pre-training data relevance can compensate for model scale. Our work revisits this question in the context of relation extraction, where the reasoning demands differ from token-level tagging.
+
+\subsection{Handling Class Imbalance}
+
+Severe class imbalance is endemic to information extraction tasks. Lin et al.~\cite{lin2017} introduced focal loss to down-weight well-classified examples, though subsequent work has shown that simple class-weighted cross-entropy often performs comparably when combined with appropriate sampling strategies. For our task, where the minority class (\texttt{at}=\textsc{true}) comprises only 12\% of examples and \texttt{isAt}=\textsc{true} only 8.4\%, addressing imbalance is not optional but essential. We adopt class-weighted loss functions calibrated to the inverse frequency of each label.
+
+%================================================================
+\section{Task and Dataset}
+\label{sec:dataset}
+%================================================================
+
+\subsection{Task Definition}
+
+HIPE-2026~\cite{opitz2026} provides newspaper articles with pre-identified (person, location) entity pairs. For each pair, systems must predict:
+\begin{enumerate}
+    \item The \texttt{at} relation: \textsc{false}, \textsc{probable}, or \textsc{true}
+    \item The \texttt{isAt} relation: \textsc{false} or \textsc{true}
+\end{enumerate}
+
+The official evaluation metric is \textbf{macro-recall} (MR), defined as the arithmetic mean of the per-class recall values, averaged over both relation types:
+\begin{equation}
+    \text{MR} = \frac{1}{2}\left(\text{MacroRecall}_{\texttt{at}} + \text{MacroRecall}_{\texttt{isAt}}\right)
+\end{equation}
+
+This metric deliberately penalises systems that ignore minority classes, making it well-suited for the imbalanced label distribution.
+
+\subsection{Dataset Statistics}
+
+We use the HIPE-2026 sandbox dataset, which contains historical newspaper articles in three languages. Table~\ref{tab:dataset} summarises the data splits.
+
+\begin{table}[t]
+\centering
+\caption{HIPE-2026 sandbox dataset statistics.}
+\label{tab:dataset}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Language} & \textbf{Train pairs} & \textbf{Dev pairs} & \textbf{Total} \\
+\midrule
+English & 496 & 151 & 647 \\
+French & 4{,}450 & 1{,}498 & 5{,}948 \\
+German & 1{,}224 & 432 & 1{,}656 \\
+\midrule
+\textbf{Total} & \textbf{6{,}170} & \textbf{2{,}081} & \textbf{8{,}251} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The dataset is heavily skewed towards French (72\% of training pairs), reflecting the composition of the underlying newspaper archives. English is the smallest subset (8\%), which poses a particular challenge for language-specific generalisation.
+
+\subsection{Label Distribution}
+
+Table~\ref{tab:labels} reveals pronounced class imbalance for both relations.
+
+\begin{table}[t]
+\centering
+\caption{Label distribution in the development set.}
+\label{tab:labels}
+\begin{tabular}{llrr}
+\toprule
+\textbf{Relation} & \textbf{Class} & \textbf{Count} & \textbf{Percentage} \\
+\midrule
+\multirow{3}{*}{\texttt{at}} & \textsc{false} & 1{,}264 & 60.7\% \\
+ & \textsc{probable} & 568 & 27.3\% \\
+ & \textsc{true} & 249 & 12.0\% \\
+\midrule
+\multirow{2}{*}{\texttt{isAt}} & \textsc{false} & 1{,}907 & 91.6\% \\
+ & \textsc{true} & 174 & 8.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The \texttt{isAt}=\textsc{true} class is especially rare, appearing in fewer than 1 in 12 pairs. Any system that defaults to predicting \textsc{false} would achieve high accuracy but catastrophic macro-recall, since it would score zero on the minority class.
+
+%================================================================
+\section{Methodology}
+\label{sec:method}
+%================================================================
+
+Figure~\ref{fig:arch} provides an overview of the MHIPEX pipeline, which consists of four stages: input enrichment, dual-head classification, post-hoc calibration, and ensemble fusion.
+
+\subsection{Input Enrichment}
+\label{sec:enrichment}
+
+Standard approaches to relation classification concatenate the document text with entity markers. We extend this with two additional signals:
+
+\begin{enumerate}
+    \item \textbf{Date token}: The publication date is embedded as \texttt{<DATE>}\,\textit{yyyy-mm-dd}\,\texttt{</DATE>}. This provides an explicit temporal anchor for the \texttt{isAt} relation, which requires reasoning about whether a person is at a location \emph{around the time of publication}.
+    \item \textbf{Language token}: The source language is embedded as \texttt{<LANG>}\,\textit{xx}\,\texttt{</LANG>}. While transformer encoders implicitly capture language-specific patterns, we hypothesise that an explicit signal helps the model adapt its decision boundary across languages with different base rates.
+\end{enumerate}
+
+The full input takes the form:
+\begin{quote}
+\texttt{<P>} \textit{person} \texttt{</P>} \texttt{<L>} \textit{location} \texttt{</L>} \texttt{<DATE>} \textit{date} \texttt{</DATE>} \texttt{<LANG>} \textit{lang} \texttt{</LANG>} \textit{document\_text}
+\end{quote}
+
+All eight marker tokens (\texttt{<P>}, \texttt{</P>}, \texttt{<L>}, \texttt{</L>}, \texttt{<DATE>}, \texttt{</DATE>}, \texttt{<LANG>}, \texttt{</LANG>}) are added to the tokeniser vocabulary and their embeddings are trained from scratch during fine-tuning.
+
+\subsection{Model Architecture}
+
+Each encoder follows a dual-head architecture built on top of a pre-trained transformer:
+
+\begin{equation}
+    \mathbf{h} = \alpha \cdot \mathbf{h}_{\text{[CLS]}} + (1-\alpha) \cdot \text{MeanPool}(\mathbf{H})
+\end{equation}
+
+where $\mathbf{h}_{\text{[CLS]}}$ is the representation of the classification token, $\mathbf{H}$ is the full sequence of hidden states, and $\alpha=0.5$. This hybrid pooling strategy captures both the global summary encoded in [CLS] and the distributed information across all positions.
+
+We apply \textbf{multi-sample dropout}~\cite{inoue2019} with $K=3$ independent masks. During training, the loss is computed as:
+\begin{equation}
+    \mathcal{L} = \frac{1}{K}\sum_{k=1}^{K}\left[\mathcal{L}_{\texttt{at}}^{(k)} + \mathcal{L}_{\texttt{isAt}}^{(k)}\right]
+\end{equation}
+
+Each $\mathcal{L}^{(k)}$ uses class-weighted cross-entropy with weights inversely proportional to class frequency. For the \texttt{at} head, the weights are $[0.80, 1.50, 2.40]$ for [\textsc{false}, \textsc{probable}, \textsc{true}]; for \texttt{isAt}, $[0.70, 2.60]$.
+
+\subsection{Training Strategy}
+
+We adopt layer-wise learning rate decay~\cite{howard2018}, where deeper transformer layers receive progressively smaller learning rates:
+\begin{equation}
+    \text{lr}_l = \text{lr}_{\text{base}} \times \gamma^{L-l}
+\end{equation}
+with decay factor $\gamma=0.90$ for hmBERT and $\gamma=0.92$ for XLM-R. This prevents catastrophic forgetting of pre-trained representations in the lower layers while allowing task-specific adaptation in the upper layers.
+
+Training uses AdamW optimisation with cosine learning rate scheduling and linear warmup over 12\% of total steps. We employ mixed-precision (FP16) training for hmBERT; for XLM-R, we disable FP16 due to numerical instability in the SentencePiece embeddings that manifests as NaN losses during early training.
+
+\subsection{Post-hoc Threshold Calibration}
+
+Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimise macro-recall. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.15, 0.70]$) and \textsc{true} ($\tau_t \in [0.15, 0.70]$). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.10, 0.90]$.
+
+\subsection{Ensemble}
+
+The final MHIPEX system combines hmBERT and XLM-R through weighted soft voting:
+\begin{equation}
+    \mathbf{p}_{\text{ens}} = \alpha \cdot \mathbf{p}_{\text{hmBERT}} + (1-\alpha) \cdot \mathbf{p}_{\text{XLM-R}}
+\end{equation}
+
+where $\alpha=0.60$, reflecting the stronger individual performance of hmBERT. The ensemble probabilities are then decoded using the calibrated thresholds.
+
+%================================================================
+\section{Experimental Setup}
+\label{sec:setup}
+%================================================================
+
+\subsection{Baselines}
+
+We compare MHIPEX against three single-model baselines, all trained with the same dual-head architecture and class-weighted loss:
+
+\begin{itemize}
+    \item \textbf{mBERT}: \texttt{bert-base-multilingual-cased} (110M parameters). A general-purpose multilingual encoder pre-trained on Wikipedia in 104 languages. Serves as the weakest reasonable baseline.
+    \item \textbf{hmBERT}: \texttt{bert-base-historic-multilingual-cased} (110M parameters)~\cite{schweter2022}. Pre-trained on historical newspapers in five European languages. Our primary encoder.
+    \item \textbf{XLM-R}: \texttt{xlm-roberta-base} (278M parameters)~\cite{conneau2020}. A large-scale cross-lingual model pre-trained on 100 languages from CommonCrawl.
+\end{itemize}
+
+\subsection{Hyperparameters}
+
+Table~\ref{tab:hyper} summarises the key hyperparameters for each model.
+
+\begin{table}[t]
+\centering
+\caption{Hyperparameters for each model configuration.}
+\label{tab:hyper}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Parameter} & \textbf{hmBERT} & \textbf{XLM-R} \\
+\midrule
+Learning rate & $8 \times 10^{-6}$ & $2 \times 10^{-5}$ \\
+Effective batch size & 64 & 64 \\
+Max sequence length & 256 & 256 \\
+Epochs (max) & 30 & 25 \\
+Early stopping patience & 8 & 6 \\
+LR decay factor ($\gamma$) & 0.90 & 0.92 \\
+Dropout (multi-sample, $K$=3) & 0.15 & 0.15 \\
+Mixed precision (FP16) & Yes & No \\
+Gradient clipping & 0.5 & 0.5 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hardware and Reproducibility}
+
+All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44. Training time was approximately 35 minutes per model. We use a fixed random seed of 42 across all runs.
+
+% --- END OF PART 1 ---
+% Sections 6-10 continue in main_part2.tex

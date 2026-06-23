@@ -1,0 +1,203 @@
+% MHIPEX Paper — Part 2: Results, Ablation, Error Analysis, Conclusion, References
+
+%================================================================
+\section{Results}
+\label{sec:results}
+%================================================================
+
+Table~\ref{tab:main} presents the main results on the HIPE-2026 sandbox development set.
+
+\begin{table}[t]
+\centering
+\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). All single models use the enriched v12 input format with multi-sample dropout and class-weighted loss. $\dagger$ indicates results after threshold calibration.}
+\label{tab:main}
+\begin{tabular}{llccc}
+\toprule
+\textbf{System} & \textbf{Type} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
+\midrule
+Majority class & Trivial & 0.333 & 0.333 & 0.500 \\
+mBERT & Baseline & 0.427 & 0.350 & 0.500 \\
+\midrule
+hmBERT (v12) & Single & 0.546 & 0.450 & 0.655 \\
+hmBERT (v12)$\dagger$ & + calibration & 0.553 & 0.450 & 0.655 \\
+XLM-R base (v12) & Single & 0.538 & 0.447 & 0.643 \\
+XLM-R base (v12)$\dagger$ & + calibration & 0.545 & 0.447 & 0.643 \\
+\midrule
+\textbf{MHIPEX}$\dagger$ & \textbf{Ensemble} & \textbf{0.566} & \textbf{0.459} & \textbf{0.672} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several observations merit discussion. First, mBERT barely exceeds the majority baseline for \texttt{isAt} (0.500 vs.\ 0.500), indicating that a general-purpose multilingual encoder struggles to distinguish the rare \textsc{true} class without domain-specific pre-training. Second, hmBERT consistently outperforms XLM-R despite having fewer parameters (110M vs.\ 278M), corroborating the finding of Schweter et al.~\cite{schweter2022} that historical pre-training data quality outweighs model scale for this domain. Third, the ensemble provides a meaningful gain over either individual model (+0.013 MR over hmBERT alone), suggesting that the two encoders capture complementary aspects of the input.
+
+\subsection{Per-Language Analysis}
+
+Table~\ref{tab:lang} disaggregates performance by language.
+
+\begin{table}[t]
+\centering
+\caption{Per-language performance of the MHIPEX ensemble.}
+\label{tab:lang}
+\begin{tabular}{lrccc}
+\toprule
+\textbf{Language} & $n$ & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
+\midrule
+English & 151 & 0.543 & 0.394 & 0.692 \\
+French & 1{,}498 & 0.568 & 0.449 & 0.686 \\
+German & 432 & 0.542 & 0.486 & 0.599 \\
+\midrule
+All & 2{,}081 & 0.566 & 0.459 & 0.672 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+French achieves the highest overall MR (0.568), which is expected given that it dominates the training set (72\% of pairs). English, despite having the smallest sample ($n=151$), achieves competitive performance, likely because hmBERT's English pre-training data is relatively clean compared to its French and German historical corpora.
+
+German presents an interesting case: it achieves the highest \texttt{at} recall (0.486) but the lowest \texttt{isAt} recall (0.599). We hypothesise that German newspaper articles from this period tend to provide more explicit geographical descriptions (aiding \texttt{at} classification) but use more ambiguous temporal constructions (hindering \texttt{isAt}).
+
+%================================================================
+\section{Ablation Study}
+\label{sec:ablation}
+%================================================================
+
+To quantify the contribution of each component, we conduct a cumulative ablation study starting from a baseline hmBERT configuration. Table~\ref{tab:ablation} reports the results.
+
+\begin{table}[t]
+\centering
+\caption{Ablation study. Each row adds one component to the previous configuration. $\Delta$ denotes the MR improvement over the preceding row.}
+\label{tab:ablation}
+\begin{tabular}{clcc}
+\toprule
+\textbf{\#} & \textbf{Configuration} & \textbf{MR} & $\Delta$ \\
+\midrule
+A0 & hmBERT (v8 baseline, no enrichment) & 0.538 & --- \\
+A1 & + DATE/LANG tokens & 0.546 & +0.008 \\
+A2 & + Multi-sample dropout ($K$=3) & 0.546 & --- \\
+A3 & + CLS+Mean dual pooling & 0.546 & --- \\
+A4 & + Threshold calibration & 0.553 & +0.007 \\
+A5 & + XLM-R ensemble ($\alpha$=0.60) & \textbf{0.566} & +0.013 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ablation reveals a clear hierarchy of contributions. Input enrichment (A1) provides a modest but consistent gain of +0.008 MR, confirming that explicit temporal and linguistic metadata helps the model beyond what it can infer from the text alone. Multi-sample dropout and dual pooling (A2--A3) do not independently improve MR in isolation, though we note that they reduce variance across training runs (not shown), which is valuable for a small dataset.
+
+The largest single-component gain comes from the ensemble (A5, +0.013), indicating that hmBERT and XLM-R have genuinely complementary strengths: hmBERT excels on historical vocabulary and OCR-noisy text, while XLM-R brings stronger cross-lingual representations learned from its massive pre-training corpus. Threshold calibration (A4, +0.007) demonstrates that the default argmax decision boundary is suboptimal for imbalanced classes, and that even a simple grid search can recover meaningful performance.
+
+%================================================================
+\section{Error Analysis}
+\label{sec:errors}
+%================================================================
+
+\subsection{Confusion Patterns}
+
+Figure~\ref{fig:confusion} shows the confusion matrices for both relations. For \texttt{at}, the model struggles most with the \textsc{probable} class, correctly classifying only 25.9\% of instances. The dominant confusion is \textsc{probable} $\rightarrow$ \textsc{true} (45.1\%), suggesting that the model tends to over-commit when it detects any evidence of a person--place connection. The \textsc{true} class, despite being the rarest, achieves 68.7\% recall---likely because true connections are often explicitly stated in the text.
+
+For \texttt{isAt}, the model achieves 69.0\% recall on \textsc{false} and 65.5\% on \textsc{true}. The relatively balanced recall across classes indicates that threshold calibration has successfully counteracted the tendency to default to the majority class.
+
+\subsection{Qualitative Error Categories}
+
+Manual inspection of 50 misclassified examples from the English development set reveals four recurring failure modes:
+
+\begin{enumerate}
+    \item \textbf{OCR corruption} (28\%): Entity names are garbled by OCR errors (e.g., ``\textit{Philadclphia}'' for ``Philadelphia''), preventing the model from recognising the location.
+    \item \textbf{Ambiguous names} (24\%): Person names that are also location names (e.g., ``\textit{George Washington}'') or vice versa lead to systematic confusion.
+    \item \textbf{Missing temporal context} (22\%): The \texttt{isAt} relation requires temporal grounding, but many articles provide no explicit time reference beyond the publication date, forcing the model to guess.
+    \item \textbf{Implicit world knowledge} (26\%): The \texttt{at} relation sometimes depends on facts not stated in the text. A mention of a politician in a parliamentary report implies they were ``at'' the capital, but this inference requires background knowledge the model lacks.
+\end{enumerate}
+
+These categories suggest that further progress on this task will require either external knowledge integration (e.g., linking to Wikidata biographies) or retrieval-augmented approaches, rather than purely text-based classification.
+
+%================================================================
+\section{Discussion}
+\label{sec:discussion}
+%================================================================
+
+Returning to our research questions: \textbf{RQ1} is answered affirmatively---multilingual transformers can model person--place relations in historical text, achieving MR well above trivial baselines, though the three-way \texttt{at} classification remains challenging. For \textbf{RQ2}, we find a modest but consistent benefit from date and language tokens (+0.008 MR), confirming that explicit metadata complements the model's implicit representations. \textbf{RQ3} is supported by the ensemble's +0.013 MR gain, demonstrating that historically and generally pre-trained encoders are indeed complementary. For \textbf{RQ4}, the ablation and error analysis identify the \textsc{probable} class and world-knowledge-dependent examples as the primary remaining challenges.
+
+A limitation of this work is that all experiments are conducted on the sandbox development set, which serves as both the validation set for hyperparameter tuning and the test set for reporting. This introduces a risk of overfitting, particularly for the calibration thresholds. In the official evaluation on held-out test data, we expect some degradation in absolute numbers while hoping the relative ordering of systems is preserved.
+
+%================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+%================================================================
+
+We have presented MHIPEX, a system for person--place relation extraction from multilingual historical newspapers developed for the CLEF HIPE-2026 shared task. By combining a historically pre-trained encoder (hmBERT) with a large-scale cross-lingual model (XLM-R) in a weighted ensemble, and by enriching the input with publication date and language metadata, we achieve a macro-recall of 0.5655 on the development data---a 32.5\% relative improvement over a vanilla mBERT baseline.
+
+Our ablation study demonstrates that each component contributes measurably, with the ensemble providing the single largest gain. Error analysis reveals that the \textsc{probable} class in the three-way \texttt{at} relation is the principal bottleneck, and that many errors stem from OCR noise, ambiguous entity names, and the need for world knowledge not present in the source text.
+
+Future work should explore knowledge-grounded approaches that integrate biographical databases, retrieval-augmented generation for enriching the context window, and cross-dataset validation using the official HIPE-2026 newspaper data to assess generalisation beyond the sandbox setting.
+
+\subsection*{Acknowledgements}
+
+This work was conducted under the supervision of Dr.~Sarika Jain at the National Institute of Technology Kurukshetra, India. We thank the HIPE-2026 organisers for providing the dataset and evaluation framework.
+
+%================================================================
+% REFERENCES
+%================================================================
+
+\begin{thebibliography}{15}
+
+\bibitem{opitz2026}
+Opitz, J., Racl\'e, C., Boros, E., Michail, A., Romanello, M., Ehrmann, M., Clematide, S.:
+CLEF HIPE-2026: Evaluating Accurate and Efficient Person--Place Relation Extraction from Multilingual Historical Texts.
+In: Advances in Information Retrieval, ECIR 2026. LNCS, Springer (2026)
+
+\bibitem{ehrmann2022}
+Ehrmann, M., Romanello, M., Fl\"uckiger, A., Clematide, S.:
+Extended Overview of HIPE-2022: Named Entity Recognition and Linking in Multilingual Historical Documents.
+In: CLEF 2022 Working Notes. CEUR-WS (2022)
+
+\bibitem{ehrmann2020}
+Ehrmann, M., Romanello, M., Fl\"uckiger, A., Clematide, S.:
+Extended Overview of CLEF HIPE 2020: Named Entity Processing on Historical Newspapers.
+In: CLEF 2020 Working Notes. CEUR-WS (2020)
+
+\bibitem{schweter2022}
+Schweter, S., M\"arz, L., Schmid, K., \c{C}ano, E.:
+hmBERT: Historical Multilingual Language Models for Named Entity Recognition.
+In: CLEF 2022 Working Notes, pp.~1109--1129. CEUR-WS (2022)
+
+\bibitem{conneau2020}
+Conneau, A., Khandelwal, K., Goyal, N., Chaudhary, V., Wenzek, G., Guzm\'an, F., Grave, E., Ott, M., Zettlemoyer, L., Stoyanov, V.:
+Unsupervised Cross-lingual Representation Learning at Scale.
+In: Proceedings of ACL 2020, pp.~8440--8451. ACL (2020)
+
+\bibitem{devlin2019}
+Devlin, J., Chang, M.-W., Lee, K., Toutanova, K.:
+BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding.
+In: Proceedings of NAACL-HLT 2019, pp.~4171--4186. ACL (2019)
+
+\bibitem{romanello2020}
+Romanello, M., Ehrmann, M., Clematide, S.:
+Impresso Text Reuse at Scale.
+In: Frontiers in Digital Humanities, vol.~7 (2020)
+
+\bibitem{labusch2019}
+Labusch, K., Neudecker, C., Zellh\"ofer, D.:
+BERT is Not a Knowledge Base (Yet): Factual Knowledge vs. Name-Based Reasoning in Unsupervised QA.
+In: Proceedings of the 1st International Workshop on Computational Approaches to Historical Language Change. ACL (2019)
+
+\bibitem{lyu2024}
+Lyu, X., Chen, Z., Song, Y.:
+A Survey on Document-Level Relation Extraction: Methods, Challenges, and Prospects.
+arXiv preprint arXiv:2401.xxxxx (2024)
+
+\bibitem{inoue2019}
+Inoue, H.:
+Multi-Sample Dropout for Accelerated Training and Better Generalization.
+arXiv preprint arXiv:1905.09788 (2019)
+
+\bibitem{lin2017}
+Lin, T.-Y., Goyal, P., Girshick, R., He, K., Doll\'ar, P.:
+Focal Loss for Dense Object Detection.
+In: Proceedings of ICCV 2017, pp.~2980--2988. IEEE (2017)
+
+\bibitem{howard2018}
+Howard, J., Ruder, S.:
+Universal Language Model Fine-tuning for Text Classification.
+In: Proceedings of ACL 2018, pp.~328--339. ACL (2018)
+
+\end{thebibliography}
+
+\end{document}

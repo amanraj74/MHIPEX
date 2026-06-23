@@ -1,0 +1,6 @@
+Experiment,Train,Test,MR,at_recall,isAt_recall
+Reference,Sandbox (EN+FR+DE),Sandbox dev,0.5525,0.4503,0.6548
+C1: Sandbox → Newspaper,Sandbox (EN+FR+DE),Newspaper v1.0,0.5881,0.4817,0.6945
+C2: FR+DE → EN (zero-shot),Sandbox (FR+DE),Sandbox EN dev,0.5306,0.4121,0.6491
+C3: EN+DE → FR (zero-shot),Sandbox (FR+DE),Sandbox EN dev,0.4897,0.3891,0.5902
+C4: EN+FR → DE (zero-shot),Sandbox (FR+DE),Sandbox EN dev,0.4910,0.4256,0.5565

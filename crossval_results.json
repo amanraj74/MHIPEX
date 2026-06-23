@@ -1,0 +1,26 @@
+[
+  {
+    "experiment": "C1: Sandbox \u2192 Newspaper",
+    "MR": 0.5881,
+    "at": 0.4817,
+    "isAt": 0.6945
+  },
+  {
+    "experiment": "C2: FR+DE \u2192 EN (zero-shot)",
+    "MR": 0.5306,
+    "at": 0.4121,
+    "isAt": 0.6491
+  },
+  {
+    "experiment": "C3: EN+DE \u2192 FR (zero-shot)",
+    "MR": 0.4897,
+    "at": 0.3891,
+    "isAt": 0.5902
+  },
+  {
+    "experiment": "C4: EN+FR \u2192 DE (zero-shot)",
+    "MR": 0.491,
+    "at": 0.4256,
+    "isAt": 0.5565
+  }
+]
