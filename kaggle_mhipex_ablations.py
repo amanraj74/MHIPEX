@@ -43,6 +43,67 @@ SPECIAL_TOKENS = ["<P>", "</P>", "<L>", "</L>", "<DATE>", "</DATE>", "<LANG>", "
 MODEL_NAME = "dbmdz/bert-base-historic-multilingual-cased"
 
 # ══════════════════════════════════════════════════════════════════
+#  Data Download & V12 Preprocessing
+# ══════════════════════════════════════════════════════════════════
+import urllib.request
+
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+PROC_DIR.mkdir(exist_ok=True)
+
+BASE_URL = "https://raw.githubusercontent.com/hipe-eval/HIPE-2026-data/main/data/sandbox"
+FILES = {
+    "en-train": f"{BASE_URL}/en-train.jsonl", "fr-train": f"{BASE_URL}/fr-train.jsonl", "de-train": f"{BASE_URL}/de-train.jsonl",
+    "en-dev":   f"{BASE_URL}/en-dev.jsonl",   "fr-dev":   f"{BASE_URL}/fr-dev.jsonl",   "de-dev":   f"{BASE_URL}/de-dev.jsonl",
+}
+
+print("\n── Downloading Data ──")
+for name, url in FILES.items():
+    dst = DATA_DIR / f"{name}.jsonl"
+    if not dst.exists():
+        print(f"  Downloading {name}.jsonl ...")
+        urllib.request.urlretrieve(url, dst)
+
+def clean_text(t, max_chars=850):
+    return re.sub(r"\s+", " ", re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", t)).strip()[:max_chars]
+
+def build_input_v12(text, pers_list, loc_list, date_str="", lang=""):
+    p = " ; ".join(clean_text(m, 100) for m in pers_list) if pers_list else "UNKNOWN"
+    l = " ; ".join(clean_text(m, 100) for m in loc_list)  if loc_list  else "UNKNOWN"
+    date_tok = f"<DATE> {date_str} </DATE> " if date_str else ""
+    lang_tok = f"<LANG> {lang} </LANG> "     if lang     else ""
+    return f"<P> {p} </P> <L> {l} </L> {date_tok}{lang_tok}{clean_text(text)}"
+
+def load_and_process(path, lang):
+    records = []
+    for line in open(path, encoding="utf-8"):
+        doc = json.loads(line)
+        date_str = str(doc.get("date", ""))[:10]
+        for pair in doc.get("sampled_pairs", []):
+            at_raw = pair.get("at", "FALSE")
+            isat_raw = pair.get("isAt", "FALSE")
+            if at_raw not in AT_MAP or isat_raw not in ISAT_MAP: continue
+            records.append({
+                "text": build_input_v12(doc["text"], pair["pers_mentions_list"], pair["loc_mentions_list"], date_str, lang),
+                "at_label": at_raw, "isat_label": isat_raw,
+                "pers_qid": pair.get("pers_wikidata_qid", pair.get("pers_qid", "")),
+                "loc_qid": pair.get("loc_wikidata_qid", pair.get("loc_qid", "")),
+                "lang": lang, "doc_id": doc["document_id"],
+            })
+    return records
+
+print("\n── Preprocessing V12 Format ──")
+for split in ["train", "dev"]:
+    out_path = PROC_DIR / f"{split}_v12.jsonl"
+    if not out_path.exists():
+        all_recs = []
+        for lang in ["en", "fr", "de"]:
+            all_recs.extend(load_and_process(DATA_DIR / f"{lang}-{split}.jsonl", lang))
+        with open(out_path, "w", encoding="utf-8") as f:
+            for r in all_recs: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(f"  Processed {split}: {len(all_recs)} pairs")
+
+# ══════════════════════════════════════════════════════════════════
 #  Shared Components
 # ══════════════════════════════════════════════════════════════════
 
