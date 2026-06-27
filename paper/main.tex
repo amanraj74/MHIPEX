@@ -13,18 +13,16 @@
 
 \title{MHIPEX: An Enriched Transformer Ensemble for\\Person--Place Relation Extraction from\\Multilingual Historical Newspapers}
 
-\author{Aman Jaiswal\inst{1} \and Sarika Jain\inst{1}}
+\author{Aman Jaiswal \and Sarika Jain}
 \authorrunning{Jaiswal and Jain}
-\institute{National Institute of Technology Kurukshetra, India\\
-\email{\{amanjaiswal, sarikajain\}@nitkkr.ac.in}}
+\institute{National Institute of Technology Kurukshetra, India}
 
 \maketitle
 
-\begin{abstract}
-This paper describes our participation in the CLEF HIPE-2026 shared task on person--place relation extraction from multilingual historical newspapers. We present MHIPEX, a system that combines two complementary transformer encoders---a historically pre-trained multilingual BERT (hmBERT) and XLM-RoBERTa---into a weighted soft-voting ensemble. Our pipeline introduces enriched input representations that embed publication date and source language as explicit tokens, multi-sample dropout with dual CLS+mean pooling, class-weighted training objectives, and post-hoc threshold calibration. On the HIPE-2026 sandbox development data, MHIPEX achieves a macro-recall of 0.5655, a +32.5\% relative improvement over a vanilla mBERT baseline. Cross-dataset validation on the separate newspaper v1.0 collection yields an MR of 0.588, confirming strong domain generalization, while cross-lingual zero-shot experiments demonstrate viable transfer across English, French, and German.
+This paper presents MHIPEX, a knowledge-aware system for person--place relation extraction from multilingual historical newspapers, developed in the context of the CLEF HIPE-2026 shared task. MHIPEX combines two complementary transformer encoders---a historically pre-trained multilingual BERT (hmBERT) and XLM-RoBERTa---into a weighted soft-voting ensemble, augmented with enriched input representations (publication date and source language tokens), multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A novel Knowledge Graph augmentation experiment, injecting Wikidata biographical and geographic facts directly into the model's context, reveals a fundamental dichotomy: static KG facts significantly improve spatial relation extraction (\texttt{at} recall +3.5\%) but act as distractors for temporal event extraction (\texttt{isAt}), exposing the need for timeline-aware reasoning beyond static fact retrieval. On the HIPE-2026 sandbox development data, MHIPEX achieves a macro-recall of 0.5655, a +32.5\% relative improvement over a vanilla mBERT baseline. Cross-dataset validation on the separate newspaper v1.0 collection yields an MR of 0.588, confirming strong domain generalization.
 \end{abstract}
 
-\keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and CLEF HIPE-2026 \and Ensemble Learning}
+\keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and Knowledge Graphs \and CLEF HIPE-2026}
 
 %================================================================
 \section{Introduction}
@@ -75,7 +73,13 @@ The HIPE-2026 task occupies an interesting middle ground: entity pairs are pre-i
 
 Cross-lingual transfer learning has been transformed by large-scale multilingual pre-training. Multilingual BERT (mBERT)~\cite{devlin2019} demonstrated surprising zero-shot cross-lingual transfer, though with diminishing returns for typologically distant languages. XLM-RoBERTa~\cite{conneau2020} scaled this approach to 100 languages using over 2~TB of CommonCrawl data, substantially outperforming mBERT on benchmarks including NER and natural language inference.
 
-A persistent question in multilingual NLP is whether domain-specific models outperform larger general-purpose ones. For historical text, Schweter et al.~\cite{schweter2022} found that hmBERT (110M parameters) outperformed the much larger XLM-R (278M) on HIPE-2022 NER, suggesting that pre-training data relevance can compensate for model scale. Our work revisits this question in the context of relation extraction, where the reasoning demands differ from token-level tagging.
+A persistent question in multilingual NLP is whether domain-specific models outperform larger general-purpose ones. For historical text, Schweter et al.~\cite{schweter2022} found that hmBERT (110M parameters) outperformed the much larger XLM-R (278M) on HIPE-2022 NER, suggesting that pre-training data relevance can compensate for model scale. Our work revisits this question in the context of relation extraction, where the reasoning demands differ from token-level tagging. We hypothesize that while hmBERT provides stronger domain-specific robustness, XLM-R's broader world knowledge---acquired from its massive modern-text corpus---may contribute complementary reasoning capabilities for the knowledge-intensive \texttt{at} relation. We test this hypothesis directly in our ensemble and Knowledge Graph experiments (Sections~\ref{sec:results} and~\ref{sec:kg}).
+
+\subsection{Knowledge Graphs and Digital Humanities Gazetteers}
+
+Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies, historical name variants) and the Getty Thesaurus of Geographic Names~(TGN; historical and multilingual place name coverage) are highly relevant but rarely integrated into NER or RE pipelines for historical documents.
+
+In the digital humanities community, the Pelagios/Recogito initiative~\cite{simon2017} has developed linked-open-data infrastructure specifically for historical place annotation in digitized texts, directly aligned with the challenges of the HIPE-2026 task. Similarly, the CIDOC Conceptual Reference Model (CIDOC-CRM) provides a formal ontology for cultural heritage that could constrain relation predictions based on entity type compatibility (e.g., ruling out implausible person--location associations). Despite their relevance, none of these resources have been systematically integrated into transformer-based relation extraction for historical newspapers. Our Knowledge Graph experiment (Section~\ref{sec:kg}) takes a first step in this direction.
 
 \subsection{Handling Class Imbalance}
 
@@ -213,7 +217,7 @@ Training uses AdamW optimization with cosine learning rate scheduling and linear
 
 \subsection{Post-hoc Threshold Calibration}
 
-Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. Given the severe class imbalance established in Table~\ref{tab:labels}, default argmax decoding systematically favors majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$.
+Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. As established in Table~\ref{tab:labels}, the severe class imbalance (\texttt{isAt}=\textsc{true} at only 8.4\%) causes default argmax decoding to systematically favor majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$.
 
 \subsection{Ensemble}
 
@@ -266,7 +270,7 @@ Gradient clipping & 0.5 & 0.5 \\
 
 \subsection{Hardware and Reproducibility}
 
-All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise, though formal statistical significance testing on larger evaluation sets remains necessary. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanjaiswal/MHIPEX}.
+All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise, though formal statistical significance testing on larger evaluation sets remains necessary. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanraj74/MHIPEX}.
 
 
 
@@ -299,7 +303,7 @@ XLM-R base (v12)$\dagger$ & Single + calib. & 0.545 & 0.447 & 0.643 \\
 
 \subsection{Overall Performance}
 
-Several observations merit discussion. First, mBERT barely exceeds the majority baseline for \texttt{isAt} (0.500 vs.\ 0.500), indicating that a general-purpose multilingual encoder struggles to distinguish the rare \textsc{true} class without domain-specific pre-training. Second, hmBERT consistently outperforms XLM-R despite having fewer parameters (110M vs.\ 278M), corroborating the finding of Schweter et al.~\cite{schweter2022} that historical pre-training data quality outweighs model scale for this domain. Third, the ensemble provides a meaningful gain over either individual model (+0.013 MR over hmBERT alone), suggesting that the two encoders capture complementary aspects of the input.
+Several observations merit discussion. First, mBERT barely exceeds the majority baseline for \texttt{isAt} (0.500 vs.\ 0.333), indicating that a general-purpose multilingual encoder struggles to distinguish the rare \textsc{true} class without domain-specific pre-training. Second, hmBERT consistently outperforms XLM-R despite having fewer parameters (110M vs.\ 278M), corroborating Schweter et al.~\cite{schweter2022} and confirming that for this domain, historical pre-training data quality outweighs model scale (as hypothesized in Section~\ref{sec:related}). Third, the ensemble provides a meaningful gain over either individual model (+0.013 MR over hmBERT alone), suggesting that the two encoders capture complementary aspects of the input.
 
 \subsection{Per-Language Analysis}
 
@@ -335,7 +339,7 @@ French achieves the highest overall MR (0.568), which is expected given that it 
 
 HIPE-2026 is the inaugural edition of the person--place relation extraction task within the CLEF evaluation framework. Unlike HIPE-2020 and HIPE-2022, which addressed named entity recognition and linking, this edition introduces a fundamentally new task formulation with no directly comparable prior results. Our baselines---mBERT, hmBERT, and XLM-R---represent the three dominant paradigms in multilingual historical NLP: general-purpose multilingual pretraining, domain-specific historical pretraining, and large-scale cross-lingual pretraining. These models dominated the HIPE-2022 leaderboards~\cite{schweter2022,ehrmann2022}, establishing them as the strongest available reference points for this new task.
 
-The consistent advantage of hmBERT over XLM-R (0.553 vs.\ 0.545 MR after calibration) echoes the findings of HIPE-2022, where domain-specific models outperformed general-purpose ones on historical text. However, the gap is narrower here than for NER, suggesting that relation extraction may benefit more from the broader world knowledge encoded in XLM-R's larger pretraining corpus.
+The consistent advantage of hmBERT over XLM-R (0.553 vs.\ 0.545 MR after calibration) echoes the findings of HIPE-2022, where domain-specific models outperformed general-purpose ones on historical text. However, the gap is narrower here than for NER, supporting our hypothesis from Section~\ref{sec:related} that relation extraction benefits more from the broader world knowledge encoded in XLM-R's larger pretraining corpus. This observation directly motivates our Knowledge Graph experiment (Section~\ref{sec:kg}), which tests whether explicit external knowledge can further bridge this gap.
 
 \subsection{Ablation Study}
 \label{sec:ablation}
@@ -496,9 +500,9 @@ We identify several limitations of the current work, each pointing to concrete d
 
 We have presented MHIPEX, a system for person--place relation extraction from multilingual historical newspapers developed for the CLEF HIPE-2026 shared task. Our four research questions are answered as follows: multilingual transformers effectively model person--place relations (RQ1), input enrichment with date and language tokens provides consistent gains (RQ2), combining hmBERT and XLM-R yields complementary improvements (RQ3), and the \textsc{probable} class remains the primary bottleneck (RQ4). The ensemble achieves a macro-recall of 0.5655 on the sandbox development data---a 32.5\% relative improvement over mBERT---and domain transfer to newspaper v1.0 yields an even stronger MR of 0.588.
 
-Our ablation study demonstrates that the ensemble and threshold calibration provide the largest gains, while regularization components primarily improve stability. Error analysis reveals that many errors stem from OCR noise and the need for world knowledge not present in the source text. To address this, we introduced a novel Knowledge Graph augmentation strategy using Wikidata. This experiment yielded a crucial scientific insight: static historical facts significantly improve spatial relation extraction (\texttt{at} recall +0.015) but act as distractors for temporal event extraction (\texttt{isAt}), highlighting the need for timeline-aware reasoning.
+Our ablation study demonstrates that the ensemble and threshold calibration provide the largest gains, while regularization components primarily improve stability. Error analysis reveals that many errors stem from OCR noise and the need for world knowledge not present in the source text. To address this, we conducted a novel Knowledge Graph augmentation experiment using Wikidata. This experiment yielded a key scientific insight that confirms our hypothesis from Section~\ref{sec:related}: static historical facts significantly improve spatial relation extraction (\texttt{at} recall +3.5\%) but act as distractors for temporal event extraction (\texttt{isAt}), exposing a fundamental distinction between spatial and temporal reasoning in historical NLP that has not been previously documented.
 
-Future work should explore more sophisticated knowledge-grounded architectures, such as Graph Neural Networks or temporal ontology constraints (e.g., CIDOC-CRM), to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation during fine-tuning could directly address the remaining character-level corruption errors.
+Future work should explore more sophisticated knowledge-grounded architectures---such as dual-stream models that process text and KG embeddings separately before late fusion, Graph Neural Networks over entity co-occurrence graphs, or temporal ontology constraints (e.g., CIDOC-CRM, Pelagios)---to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation~\cite{lin2017} during fine-tuning could directly address the remaining character-level corruption errors.
 
 \subsection*{Acknowledgements}
 
@@ -574,6 +578,11 @@ In: Proceedings of ACL 2018, pp.~328--339. ACL (2018)
 Soares, L.B., FitzGerald, N., Ling, J., Kwiatkowski, T.:
 Matching the Blanks: Distributional Similarity Meets Entity Pair Relations.
 In: Proceedings of ACL 2019, pp.~2895--2905. ACL (2019)
+
+\bibitem{simon2017}
+Simon, R., Barker, E., Isaksen, L., de Soto Ca\~namares, P.:
+Linked Data Annotation Without the Pointy Brackets: Introducing Recogito 2.
+Journal of Map \& Geography Libraries 13(1), 111--132 (2017)
 
 \end{thebibliography}
 
