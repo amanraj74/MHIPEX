@@ -1,0 +1,4 @@
+Experiment,MR,at_recall,isAt_recall
+Weighted CE,0.5689,0.4735,0.6644
+Focal Loss,0.5662,0.4628,0.6696
+Unweighted CE,0.5677,0.4713,0.6641

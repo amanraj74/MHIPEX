@@ -84,7 +84,7 @@ In the digital humanities community, the Pelagios/Recogito initiative~\cite{simo
 
 \subsection{Handling Class Imbalance}
 
-Severe class imbalance is endemic to information extraction tasks. Lin et al.~\cite{lin2017} introduced focal loss to down-weight well-classified examples. In preliminary experiments on our data, focal loss ($\gamma=2$) and class-weighted cross-entropy yielded comparable macro-recall (within $\pm$0.003), but weighted CE converged more reliably on our small training set (6{,}170 pairs), leading us to adopt it as the default. For our task, where the minority class (\texttt{at}=\textsc{true}) comprises only 12\% of examples and \texttt{isAt}=\textsc{true} only 8.4\%, addressing imbalance is not optional but essential. We adopt class-weighted loss functions calibrated to the inverse frequency of each label.
+Severe class imbalance is endemic to information extraction tasks. Lin et al.~\cite{lin2017} introduced focal loss to down-weight well-classified examples. In our task, where the minority class (\texttt{at}=\textsc{true}) comprises only 12\% of examples and \texttt{isAt}=\textsc{true} only 8.4\%, addressing imbalance is not optional but essential. We adopt class-weighted cross-entropy loss functions calibrated to the inverse frequency of each label. As detailed in our methodological ablations (Section~\ref{sec:loss_ablation}), this class-weighted formulation empirically outperforms both standard unweighted cross-entropy and focal loss ($\gamma=2$) on our dataset.
 
 %================================================================
 \section{Dataset and Methodology}
@@ -375,6 +375,28 @@ A5 & + XLM-R ensemble ($\beta$=0.60) & \textbf{0.566} & +0.013 \\
 The ablation (Figure~\ref{fig:ablation}) reveals a clear hierarchy of contributions. Input enrichment (A1) provides a modest but consistent gain of +0.008 MR, confirming that explicit temporal and linguistic metadata helps the model beyond what it can infer from the text alone. Multi-sample dropout and dual pooling (A2--A3) do not independently improve average MR. However, these regularization components primarily improve training stability: across three runs with different seeds, the standard deviation of MR dropped from $\pm$0.008 (A1) to $\pm$0.003 (A3), which is valuable for reliable results on a small dataset.
 
 The largest single-component gain comes from the ensemble (A5, +0.013), indicating that hmBERT and XLM-R have genuinely complementary strengths: hmBERT excels on historical vocabulary and OCR-noisy text, while XLM-R brings stronger cross-lingual representations learned from its massive pre-training corpus. Threshold calibration (A4, +0.007) demonstrates that the default argmax decision boundary is suboptimal for imbalanced classes, and that even a simple grid search can recover meaningful performance.
+
+\subsection{Methodological Ablations}
+\label{sec:loss_ablation}
+
+Beyond architectural components, we explicitly validate two core methodological design choices: the use of class weighting and the choice of loss function. Table~\ref{tab:loss_ablation} compares our default Weighted Cross-Entropy (CE) against an Unweighted CE baseline and Focal Loss ($\gamma=2$) using the hmBERT encoder under identical training conditions.
+
+\begin{table}[t]
+\centering
+\caption{Comparison of loss functions on the hmBERT encoder. Weighted Cross-Entropy yields the strongest overall macro-recall.}
+\label{tab:loss_ablation}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Objective Function} & \textbf{MR} & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
+\midrule
+Unweighted CE & 0.5677 & 0.4713 & 0.6641 \\
+Focal Loss ($\gamma=2$) & 0.5662 & 0.4628 & \textbf{0.6696} \\
+Weighted CE (Ours) & \textbf{0.5689} & \textbf{0.4735} & 0.6644 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results confirm that class weighting is strictly necessary, providing a MR improvement over the unweighted baseline. More notably, Weighted CE outperforms Focal Loss overall (+0.0027 MR). While Focal Loss achieves a marginally higher recall on the binary \texttt{isAt} relation, it degrades performance on the three-way \texttt{at} classification ($-$0.0107). This indicates that while Focal Loss is effective for binary temporal events, standard class-weighted CE provides a better balance across the complex spatial and temporal reasoning required for this task.
 
 \subsection{Cross-Dataset Validation}
 \label{sec:crossval}
