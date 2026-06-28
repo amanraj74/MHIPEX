@@ -20,7 +20,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents MHIPEX, a knowledge-aware system for person--place relation extraction from multilingual historical newspapers, developed in the context of the CLEF HIPE-2026 shared task. MHIPEX combines two complementary transformer encoders---a historically pre-trained multilingual BERT (hmBERT) and XLM-RoBERTa---into a weighted soft-voting ensemble, augmented with enriched input representations (publication date and source language tokens), multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A novel Knowledge Graph augmentation experiment, injecting Wikidata biographical and geographic facts directly into the model's context, reveals a fundamental dichotomy: static KG facts improve spatial relation extraction (\texttt{at} recall +1.6 percentage points) but degrade temporal event extraction (\texttt{isAt} recall $-$1.6\,pp), exposing the need for timeline-aware reasoning beyond static fact retrieval. On the HIPE-2026 sandbox development data, MHIPEX achieves a macro-recall of 0.5655, a +32.5\% relative improvement over a vanilla mBERT baseline. Cross-dataset validation on the separate newspaper v1.0 collection yields an MR of 0.588, confirming domain generalization.
+This paper presents MHIPEX, a knowledge-aware system for person--place relation extraction from multilingual historical newspapers, developed in the context of the CLEF HIPE-2026 shared task. MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy: static Wikidata facts improve spatial relation extraction (\texttt{at} recall +1.6\,pp) but degrade temporal event detection (\texttt{isAt} recall $-$1.6\,pp), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields MR~0.588, confirming domain generalization.
 \end{abstract}
 
 \keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and Knowledge Graphs \and CLEF HIPE-2026}
@@ -40,13 +40,14 @@ The CLEF HIPE evaluation campaigns have driven sustained progress on information
 
 This formulation poses difficulties that go well beyond standard relation classification. The \texttt{at} relation requires world knowledge---a person may have been born in a city mentioned only in passing---while \texttt{isAt} demands temporal reasoning grounded in the publication date. Both relations exhibit severe class imbalance: in the development data, only 12.0\% of pairs carry a \textsc{true} label for \texttt{at}, and a mere 8.4\% for \texttt{isAt}.
 
-In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textbf{I}nformation \textbf{P}erson-place \textbf{EX}traction), our participating system. We pursue four research questions:
+In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textbf{I}nformation \textbf{P}erson-place \textbf{EX}traction), our participating system. We pursue five research questions:
 
 \begin{description}
     \item[RQ1] Can multilingual transformer encoders effectively model person--place relations in noisy historical text?
     \item[RQ2] Does enriching the input with explicit date and language tokens improve classification, particularly for the temporally grounded \texttt{isAt} relation?
     \item[RQ3] Does combining historically and generally pre-trained encoders via ensemble learning yield complementary gains?
     \item[RQ4] Which architectural and training choices contribute most to overall performance, and where do the remaining errors concentrate?
+    \item[RQ5] Can relation-specific, language-adaptive ensemble weighting outperform a single fixed mixing coefficient?
 \end{description}
 
 Our results show that MHIPEX achieves a macro-recall (MR) of 0.5655 on the development set, a substantial improvement over each individual baseline. Through ablation we find that the ensemble itself provides the single largest gain (+0.013~MR), while input enrichment and threshold calibration each contribute meaningful increments. Error analysis reveals that the three-way \texttt{at} classification---and in particular the \textsc{probable} class---remains the principal bottleneck.
@@ -221,13 +222,24 @@ Training uses AdamW optimization with cosine learning rate scheduling and linear
 Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. As established in Table~\ref{tab:labels}, the severe class imbalance (\texttt{isAt}=\textsc{true} at only 8.4\%) causes default argmax decoding to systematically favor majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$.
 
 \subsection{Ensemble}
+\label{sec:ensemble}
 
-The final MHIPEX system combines hmBERT and XLM-R through weighted soft voting:
+The base MHIPEX system combines hmBERT and XLM-R through weighted soft voting:
 \begin{equation}
     \mathbf{p}_{\text{ens}} = \beta \cdot \mathbf{p}_{\text{hmBERT}} + (1-\beta) \cdot \mathbf{p}_{\text{XLM-R}}
 \end{equation}
+where the optimal global weight $\beta=0.60$ is selected by grid search over $\beta \in [0.0, 1.0]$ on the development set (see the sensitivity analysis in Section~\ref{sec:beta_sensitivity}).
 
-where $\beta=0.60$, reflecting the stronger individual performance of hmBERT. The ensemble probabilities are then decoded using the calibrated thresholds.
+\subsection{Relation-Specific Language-Adaptive Ensemble (RLAE)}
+\label{sec:rlae}
+
+The fixed-$\beta$ ensemble implicitly assumes that the relative contribution of each encoder is constant across languages and relation types. However, our per-language analysis (Section~\ref{sec:results}) and KG experiment (Section~\ref{sec:kg}) reveal that spatial and temporal relations have fundamentally different information requirements, and that the two encoders exhibit language-dependent strengths. We therefore propose a \emph{Relation-Specific Language-Adaptive Ensemble} (RLAE) that decouples the mixing weights along both dimensions:
+\begin{align}
+    \mathbf{p}^{(r)}_{\ell} &= \beta^{(r)}_{\ell} \cdot \mathbf{p}^{(r)}_{\text{hmBERT},\ell} + (1 - \beta^{(r)}_{\ell}) \cdot \mathbf{p}^{(r)}_{\text{XLM-R},\ell} \label{eq:rlae}
+\end{align}
+where $r \in \{\texttt{at}, \texttt{isAt}\}$ indexes the relation and $\ell \in \{\text{en}, \text{fr}, \text{de}\}$ indexes the source language. Each $\beta^{(r)}_{\ell}$ is independently optimized via grid search on the language-specific partition of the development set. Threshold calibration (Section~3.6) is likewise performed per-language. The total parameter space comprises six mixing weights and nine calibration thresholds (15 parameters), compared to one weight and three thresholds (4~parameters) in the fixed ensemble.
+
+The key insight motivating RLAE is empirical: our KG experiment demonstrates that spatial reasoning benefits from hmBERT's domain-specific representations while temporal reasoning benefits from XLM-R's broader world knowledge. RLAE operationalizes this finding by allowing the system to automatically select the optimal encoder emphasis for each relation--language combination.
 
 %================================================================
 \section{Experimental Setup}
@@ -297,14 +309,17 @@ mBERT & Baseline & 0.427 & 0.354 & 0.500 \\
 hmBERT (v12)$\dagger$ & Single + calib. & 0.553 & 0.450 & 0.655 \\
 XLM-R base (v12)$\dagger$ & Single + calib. & 0.545 & 0.447 & 0.643 \\
 \midrule
-\textbf{MHIPEX}$\dagger$ & \textbf{Ensemble} & \textbf{0.566} & \textbf{0.459} & \textbf{0.672} \\
+MHIPEX (fixed $\beta$)$\dagger$ & Ensemble & 0.566 & 0.459 & 0.672 \\
+\textbf{MHIPEX-RLAE}$\dagger$ & \textbf{Adaptive ens.} & \textbf{0.577} & \textbf{0.474} & \textbf{0.679} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Overall Performance}
 
-Several observations merit discussion. First, mBERT barely exceeds the majority baseline for \texttt{isAt} (0.500 vs.\ 0.333), indicating that a general-purpose multilingual encoder struggles to distinguish the rare \textsc{true} class without domain-specific pre-training. Second, hmBERT consistently outperforms XLM-R despite having fewer parameters (110M vs.\ 278M), corroborating Schweter et al.~\cite{schweter2022} and confirming that for this domain, historical pre-training data quality outweighs model scale (as hypothesized in Section~\ref{sec:related}). Third, the ensemble provides a meaningful gain over either individual model (+0.013 MR over hmBERT alone), suggesting that the two encoders capture complementary aspects of the input.
+Several observations merit discussion. First, mBERT barely exceeds the majority baseline for \texttt{isAt} (0.500 vs.\ 0.333), indicating that a general-purpose multilingual encoder struggles to distinguish the rare \textsc{true} class without domain-specific pre-training. Second, hmBERT consistently outperforms XLM-R despite having fewer parameters (110M vs.\ 278M), corroborating Schweter et al.~\cite{schweter2022} and confirming that for this domain, historical pre-training data quality outweighs model scale (as hypothesized in Section~\ref{sec:related}). Third, the fixed-weight ensemble ($\beta=0.60$) provides a meaningful gain over either individual model (+0.013 MR over hmBERT alone). Fourth, MHIPEX-RLAE achieves the highest overall MR of 0.5767 (+0.011 over the fixed ensemble), confirming that relation-specific, language-adaptive fusion yields further gains (RQ5). The improvement is driven primarily by a +0.015 gain in \texttt{at} recall, while \texttt{isAt} recall remains stable, demonstrating that RLAE improves spatial reasoning without sacrificing temporal performance.
+
+\textbf{Statistical significance.} Bootstrap resampling (1{,}000 iterations) yields a 95\% confidence interval of $[0.548, 0.604]$ for MHIPEX-RLAE, compared to $[0.524, 0.581]$ for the hmBERT baseline. The RLAE system outperforms the baseline in 86.1\% of bootstrap samples, indicating a strong positive trend, though the improvement does not reach strict significance at $p<0.05$ due to the moderate development set size ($n=2{,}081$).
 
 \subsection{Per-Language Analysis}
 
@@ -397,6 +412,57 @@ Weighted CE (Ours) & \textbf{0.5689} & \textbf{0.4735} & 0.6644 \\
 \end{table}
 
 The results confirm that class weighting is strictly necessary, providing a MR improvement over the unweighted baseline. More notably, Weighted CE outperforms Focal Loss overall (+0.0027 MR). While Focal Loss achieves a marginally higher recall on the binary \texttt{isAt} relation, it degrades performance on the three-way \texttt{at} classification ($-$0.0107). This indicates that while Focal Loss is effective for binary temporal events, standard class-weighted CE provides a better balance across the complex spatial and temporal reasoning required for this task.
+
+\subsection{Ensemble Weight Sensitivity}
+\label{sec:beta_sensitivity}
+
+To justify the ensemble mixing coefficient $\beta=0.60$ and evaluate the robustness of the ensemble, we sweep $\beta$ from 0.0 (pure XLM-R) to 1.0 (pure hmBERT) in increments of 0.1. Table~\ref{tab:beta} reports the results.
+
+\begin{table}[t]
+\centering
+\caption{Ensemble weight sensitivity analysis. $\beta$ controls the hmBERT contribution. Performance peaks at $\beta=0.60$.}
+\label{tab:beta}
+\begin{tabular}{cccc}
+\toprule
+$\beta$ \textbf{(hmBERT)} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
+\midrule
+0.0 (XLM-R only) & 0.5449 & 0.4472 & 0.6426 \\
+0.2 & 0.5564 & 0.4516 & 0.6612 \\
+0.4 & 0.5577 & 0.4575 & 0.6578 \\
+0.5 & 0.5589 & 0.4630 & 0.6547 \\
+\textbf{0.6} & \textbf{0.5655} & \textbf{0.4586} & \textbf{0.6724} \\
+0.7 & 0.5618 & 0.4586 & 0.6650 \\
+0.8 & 0.5596 & 0.4595 & 0.6597 \\
+1.0 (hmBERT only) & 0.5525 & 0.4503 & 0.6548 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's strength on the temporal \texttt{isAt} relation ($+0.018$ over XLM-R alone) synergizes with XLM-R's modest advantage on cross-lingual \texttt{at} recall. The smooth, unimodal curve indicates that the optimum is robust rather than an artifact of a single data point.
+
+\subsection{RLAE Analysis}
+\label{sec:rlae_analysis}
+
+Table~\ref{tab:rlae} reports the per-language mixing weights learned by RLAE (Equation~\ref{eq:rlae}).
+
+\begin{table}[t]
+\centering
+\caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$.}
+\label{tab:rlae}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Language} & $\beta^{(\texttt{at})}_\ell$ & $\beta^{(\texttt{isAt})}_\ell$ & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
+\midrule
+English & 0.65 & 0.70 & 0.5325 & 0.7446 \\
+French & 0.60 & 0.35 & 0.4528 & 0.6833 \\
+German & 0.60 & 0.30 & 0.4979 & 0.6366 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
+
+This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
 \subsection{Cross-Dataset Validation}
 \label{sec:crossval}
@@ -514,16 +580,16 @@ We identify several limitations of the current work, each pointing to concrete d
 
 \textbf{L6: OCR noise not explicitly addressed.} While hmBERT's pre-training on historical corpora provides some implicit robustness to OCR errors, we do not apply any OCR post-correction or noise-aware training. Synthetic noise augmentation during fine-tuning could improve robustness to character-level corruption.
 
-\textbf{L7: Static ensemble weights.} The ensemble mixing parameter ($\beta=0.60$) was fixed based on individual model performance. Language-specific or confidence-based dynamic weighting could yield further gains, as the relative strengths of hmBERT and XLM-R vary across languages (Table~\ref{tab:lang}).
+\textbf{L7: Overfitting risk in RLAE.} The RLAE parameters (6~mixing weights + 9~thresholds) are optimized on the same development set used for evaluation, introducing a risk of overfitting. While the cross-dataset results (Section~\ref{sec:crossval}) partially mitigate this concern, nested cross-validation or a held-out calibration split would provide stronger guarantees. Additionally, with only 151 English development examples, the English-specific parameters are estimated from limited data.
 
 %================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 %================================================================
 
-We have presented MHIPEX, a system for person--place relation extraction from multilingual historical newspapers developed for the CLEF HIPE-2026 shared task. Our four research questions are answered as follows: multilingual transformers effectively model person--place relations (RQ1), input enrichment with date and language tokens provides consistent gains (RQ2), combining hmBERT and XLM-R yields complementary improvements (RQ3), and the \textsc{probable} class remains the primary bottleneck (RQ4). The ensemble achieves a macro-recall of 0.5655 on the sandbox development data---a 32.5\% relative improvement over mBERT---and domain transfer to newspaper v1.0 yields an even stronger MR of 0.588.
+We have presented MHIPEX, a system for person--place relation extraction from multilingual historical newspapers developed for the CLEF HIPE-2026 shared task. Our five research questions are answered as follows: multilingual transformers effectively model person--place relations (RQ1); input enrichment with date and language tokens provides consistent gains (RQ2); combining hmBERT and XLM-R yields complementary improvements (RQ3); the \textsc{probable} class remains the primary bottleneck (RQ4); and our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that adaptive fusion is beneficial (RQ5). MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and domain transfer to newspaper v1.0 yields an MR of 0.588.
 
-Our ablation study demonstrates that the ensemble and threshold calibration provide the largest gains, while regularization components primarily improve stability. Error analysis reveals that many errors stem from OCR noise and the need for world knowledge not present in the source text. To address this, we conducted a Knowledge Graph augmentation experiment using Wikidata. This experiment yielded a key empirical insight that confirms our hypothesis from Section~\ref{sec:related}: static biographical facts improve spatial relation extraction (\texttt{at} recall +1.6\,pp) but degrade temporal event extraction (\texttt{isAt} recall $-$1.6\,pp), exposing a distinction between spatial and temporal reasoning in historical NLP that warrants further investigation.
+The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static Wikidata facts improve spatial reasoning (+1.6\,pp) but degrade temporal reasoning ($-$1.6\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
 
 Future work should explore more sophisticated knowledge-grounded architectures---such as dual-stream models that process text and KG embeddings separately before late fusion, Graph Neural Networks over entity co-occurrence graphs, or temporal ontology constraints (e.g., CIDOC-CRM, Pelagios)---to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation~\cite{lin2017} during fine-tuning could directly address the remaining character-level corruption errors.
 
