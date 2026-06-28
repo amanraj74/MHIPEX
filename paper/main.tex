@@ -11,7 +11,7 @@
 
 \begin{document}
 
-\title{MHIPEX: An Enriched Transformer Ensemble for\\Person--Place Relation Extraction from\\Multilingual Historical Newspapers}
+\title{MHIPEX: A Calibrated Transformer Ensemble for\\Multilingual Person--Place Relation Extraction\\in Historical Newspapers}
 
 \author{Aman Jaiswal \and Sarika Jain}
 \authorrunning{Jaiswal and Jain}
@@ -20,7 +20,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents MHIPEX, a knowledge-aware system for person--place relation extraction from multilingual historical newspapers, developed in the context of the CLEF HIPE-2026 shared task. MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy: static Wikidata facts improve spatial relation extraction (\texttt{at} recall +1.6\,pp) but degrade temporal event detection (\texttt{isAt} recall $-$1.6\,pp), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields MR~0.588, confirming domain generalization.
+This paper presents MHIPEX, a general knowledge-aware framework for person--place relation extraction from multilingual historical newspapers. Evaluated in the context of the CLEF HIPE-2026 shared task, MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy: static Wikidata facts improve spatial relation extraction (\texttt{at} recall +1.6\,pp) but degrade temporal event detection (\texttt{isAt} recall $-$1.6\,pp), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields a macro-recall of 0.588, confirming the robustness of the framework for broader multilingual historical relation extraction tasks.
 \end{abstract}
 
 \keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and Knowledge Graphs \and CLEF HIPE-2026}
@@ -40,7 +40,7 @@ The CLEF HIPE evaluation campaigns have driven sustained progress on information
 
 This formulation poses difficulties that go well beyond standard relation classification. The \texttt{at} relation requires world knowledge---a person may have been born in a city mentioned only in passing---while \texttt{isAt} demands temporal reasoning grounded in the publication date. Both relations exhibit severe class imbalance: in the development data, only 12.0\% of pairs carry a \textsc{true} label for \texttt{at}, and a mere 8.4\% for \texttt{isAt}.
 
-In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textbf{I}nformation \textbf{P}erson-place \textbf{EX}traction), our participating system. We pursue five research questions:
+In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textbf{I}nformation \textbf{P}erson-place \textbf{EX}traction). While initially developed for the HIPE-2026 shared task, MHIPEX is designed as a general framework applicable to broad multilingual historical relation extraction. We pursue five research questions:
 
 \begin{description}
     \item[RQ1] Can multilingual transformer encoders effectively model person--place relations in noisy historical text?
@@ -473,17 +473,18 @@ The learned weights reveal a striking pattern: for the spatial \texttt{at} relat
 
 This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
-\subsection{Cross-Dataset Validation}
+\subsection{Generalization Analysis}
 \label{sec:crossval}
 
-A key concern with any supervised system is whether it generalizes beyond the specific data distribution on which it was trained. We conduct two types of cross-dataset experiments using hmBERT (our strongest single model): \emph{domain transfer} across data sources and \emph{cross-lingual transfer} across languages.
+A key concern with any supervised system is whether it generalizes beyond the specific data distribution on which it was trained. We conduct three types of generalization experiments using hmBERT (our strongest single model): \emph{in-domain}, \emph{cross-domain} transfer across data sources, and \emph{zero-shot cross-lingual} transfer across languages.
 
-\paragraph{Domain Transfer.}
+\subsubsection{In-Domain Generalization}
+The reference performance is established by training on the standard HIPE-2026 sandbox training set and evaluating on the corresponding sandbox development set.
 
+\subsubsection{Cross-Domain Transfer}
 The HIPE-2026 organizers provide two distinct data sources: the \emph{sandbox} used for all preceding experiments, and the \emph{newspaper v1.0} collection (1{,}251 pairs across EN/FR/DE). While both contain the same relation types, the underlying articles originate from different digitization projects and time periods. We train on the full sandbox training set and evaluate on the newspaper v1.0 data.
 
-\paragraph{Cross-Lingual Zero-Shot Transfer.}
-
+\subsubsection{Cross-Lingual Zero-Shot Transfer}
 We conduct leave-one-language-out experiments: training on two languages and evaluating on the held-out third. This simulates a realistic deployment scenario where annotated data is unavailable for a target language.
 
 \begin{table}[t]
@@ -596,7 +597,7 @@ We identify several limitations of the current work, each pointing to concrete d
 \label{sec:conclusion}
 %================================================================
 
-We have presented MHIPEX, a system for person--place relation extraction from multilingual historical newspapers developed for the CLEF HIPE-2026 shared task. Our five research questions are answered as follows: multilingual transformers effectively model person--place relations (RQ1); input enrichment with date and language tokens provides consistent gains (RQ2); combining hmBERT and XLM-R yields complementary improvements (RQ3); the \textsc{probable} class remains the primary bottleneck (RQ4); and our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that adaptive fusion is beneficial (RQ5). MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and domain transfer to newspaper v1.0 yields an MR of 0.588.
+We have presented MHIPEX, a general framework for person--place relation extraction from multilingual historical newspapers. Evaluated within the rigorous CLEF HIPE-2026 shared task setting, our findings demonstrate that multilingual transformers effectively model these complex relations (RQ1) and that input enrichment with date and language tokens provides consistent gains (RQ2). Furthermore, combining hmBERT and XLM-R yields complementary improvements (RQ3), though the ambiguous \textsc{probable} class remains the primary bottleneck (RQ4). Most significantly, our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that conditional adaptive fusion is highly beneficial (RQ5). Overall, MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and proves its broad applicability with a domain transfer MR of 0.588 on newspaper v1.0.
 
 The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static Wikidata facts improve spatial reasoning (+1.6\,pp) but degrade temporal reasoning ($-$1.6\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
 
