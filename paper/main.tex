@@ -224,6 +224,7 @@ with decay factor $\gamma=0.90$ for hmBERT and $\gamma=0.92$ for XLM-R. This pre
 Training uses AdamW optimization with cosine learning rate scheduling and linear warmup over 12\% of total steps. We employ mixed-precision (FP16) training for hmBERT; for XLM-R, we disable FP16 due to numerical instability in the SentencePiece embeddings that manifests as NaN losses during early training.
 
 \subsection{Post-hoc Threshold Calibration}
+\label{sec:calibration}
 
 Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. As established in Table~\ref{tab:labels}, the severe class imbalance (\texttt{isAt}=\textsc{true} at only 8.4\%) causes default argmax decoding to systematically favor majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$.
 
@@ -243,9 +244,11 @@ The fixed-$\beta$ ensemble implicitly assumes that the relative contribution of 
 \begin{align}
     \mathbf{p}^{(r)}_{\ell} &= \beta^{(r)}_{\ell} \cdot \mathbf{p}^{(r)}_{\text{hmBERT},\ell} + (1 - \beta^{(r)}_{\ell}) \cdot \mathbf{p}^{(r)}_{\text{XLM-R},\ell} \label{eq:rlae}
 \end{align}
-where $r \in \{\texttt{at}, \texttt{isAt}\}$ indexes the relation and $\ell \in \{\text{en}, \text{fr}, \text{de}\}$ indexes the source language. Each $\beta^{(r)}_{\ell}$ is independently optimized via grid search on the language-specific partition of the development set. Threshold calibration (Section~3.6) is likewise performed per-language. The total parameter space comprises six mixing weights and nine calibration thresholds (15 parameters), compared to one weight and three thresholds (4~parameters) in the fixed ensemble.
+where $r \in \{\texttt{at}, \texttt{isAt}\}$ indexes the relation and $\ell \in \{\text{en}, \text{fr}, \text{de}\}$ indexes the source language. Each $\beta^{(r)}_{\ell}$ is independently optimized via grid search on the language-specific partition of the development set. Threshold calibration (Section~\ref{sec:calibration}) is likewise performed per-language. The total parameter space comprises six mixing weights and nine calibration thresholds (15 parameters), compared to one weight and three thresholds (4~parameters) in the fixed ensemble.
 
 The key insight motivating RLAE is empirical: our KG experiment demonstrates that spatial reasoning benefits from hmBERT's domain-specific representations while temporal reasoning benefits from XLM-R's broader world knowledge. RLAE operationalizes this finding by allowing the system to automatically select the optimal encoder emphasis for each relation--language combination.
+
+From a theoretical perspective, RLAE can be understood as a conditional Mixture-of-Experts~\cite{garmash2016} where the gating function is conditioned on observable metadata (language tag and relation type) rather than on learned input features. By partitioning the prediction space into more homogeneous subsets, per-group optimization reduces within-group ensemble variance without the overfitting risk of fully learned gating on small data. Unlike attention-based fusion, this approach yields interpretable, transparent weights that directly reveal which encoder dominates for each condition. Importantly, RLAE operates entirely as a post-hoc procedure on saved probability tensors and requires no model retraining.
 
 %================================================================
 \section{Experimental Setup}
@@ -289,10 +292,7 @@ Gradient clipping & 0.5 & 0.5 \\
 
 \subsection{Hardware and Reproducibility}
 
-All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise, though formal statistical significance testing on larger evaluation sets remains necessary. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanraj74/MHIPEX}.
-
-
-
+All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise. The RLAE procedure (Section~\ref{sec:rlae}) is applied post-hoc on saved probability tensors and does not require retraining. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanraj74/MHIPEX}.
 
 %================================================================
 \section{Results and Analysis}
@@ -333,7 +333,7 @@ Table~\ref{tab:lang} disaggregates performance by language.
 
 \begin{table}[t]
 \centering
-\caption{Per-language performance of the MHIPEX ensemble.}
+\caption{Per-language performance of the MHIPEX fixed-$\beta$ ensemble ($\beta=0.60$). RLAE per-language weights are reported separately in Table~\ref{tab:rlae}.}
 \label{tab:lang}
 \begin{tabular}{lrccc}
 \toprule
@@ -383,7 +383,8 @@ A1 & + DATE/LANG tokens & 0.546 & +0.008 \\
 A2 & + Multi-sample dropout ($K$=3) & 0.546 & --- \\
 A3 & + CLS+Mean dual pooling & 0.546 & --- \\
 A4 & + Threshold calibration & 0.553 & +0.007 \\
-A5 & + XLM-R ensemble ($\beta$=0.60) & \textbf{0.566} & +0.013 \\
+A5 & + XLM-R ensemble ($\beta$=0.60) & 0.566 & +0.013 \\
+A6 & + RLAE (per-lang, per-rel $\beta$) & \textbf{0.577} & +0.011 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -446,7 +447,7 @@ $\beta$ \textbf{(hmBERT)} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt
 \end{tabular}
 \end{table}
 
-The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's strength on the temporal \texttt{isAt} relation ($+0.018$ over XLM-R alone) synergizes with XLM-R's modest advantage on cross-lingual \texttt{at} recall. The smooth, unimodal curve indicates that the optimum is robust rather than an artifact of a single data point.
+The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's strength on the temporal \texttt{isAt} relation ($+0.018$ over XLM-R alone) synergizes with XLM-R's modest advantage on cross-lingual \texttt{at} recall. The smooth, unimodal trend indicates that the optimum is robust rather than an artifact of a single data point.
 
 \subsection{RLAE Analysis}
 \label{sec:rlae_analysis}
@@ -479,7 +480,7 @@ A key concern with any supervised system is whether it generalizes beyond the sp
 
 \paragraph{Domain Transfer.}
 
-The HIPE-2026 organizers provide two distinct data sources: the \emph{sandbox} used for all preceding experiments, and the \emph{newspaper v1.0} collection (1,251 pairs across EN/FR/DE). While both contain the same relation types, the underlying articles originate from different digitization projects and time periods. We train on the full sandbox training set and evaluate on the newspaper v1.0 data.
+The HIPE-2026 organizers provide two distinct data sources: the \emph{sandbox} used for all preceding experiments, and the \emph{newspaper v1.0} collection (1{,}251 pairs across EN/FR/DE). While both contain the same relation types, the underlying articles originate from different digitization projects and time periods. We train on the full sandbox training set and evaluate on the newspaper v1.0 data.
 
 \paragraph{Cross-Lingual Zero-Shot Transfer.}
 
@@ -599,7 +600,7 @@ We have presented MHIPEX, a system for person--place relation extraction from mu
 
 The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static Wikidata facts improve spatial reasoning (+1.6\,pp) but degrade temporal reasoning ($-$1.6\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
 
-Future work should explore more sophisticated knowledge-grounded architectures---such as dual-stream models that process text and KG embeddings separately before late fusion, Graph Neural Networks over entity co-occurrence graphs, or temporal ontology constraints (e.g., CIDOC-CRM, Pelagios)---to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation~\cite{lin2017} during fine-tuning could directly address the remaining character-level corruption errors.
+Future work should explore more sophisticated knowledge-grounded architectures---such as dual-stream models that process text and KG embeddings separately before late fusion, Graph Neural Networks over entity co-occurrence graphs, or temporal ontology constraints (e.g., CIDOC-CRM~\cite{doerr2003}, Pelagios~\cite{simon2017})---to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation~\cite{boros2020} during fine-tuning could directly address the remaining character-level corruption errors.
 
 \subsection*{Acknowledgements}
 
