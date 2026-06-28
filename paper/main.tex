@@ -50,7 +50,7 @@ In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textb
     \item[RQ5] Can relation-specific, language-adaptive ensemble weighting outperform a single fixed mixing coefficient?
 \end{description}
 
-Our results show that MHIPEX achieves a macro-recall (MR) of 0.5655 on the development set, a substantial improvement over each individual baseline. Through ablation we find that the ensemble itself provides the single largest gain (+0.013~MR), while input enrichment and threshold calibration each contribute meaningful increments. Error analysis reveals that the three-way \texttt{at} classification---and in particular the \textsc{probable} class---remains the principal bottleneck.
+Our results show that MHIPEX-RLAE achieves a macro-recall (MR) of 0.5767 on the development set (95\% CI: $[0.548, 0.604]$), a substantial improvement over each individual baseline and +0.011 over the fixed-weight ensemble. Through ablation we find that the ensemble provides the single largest architectural gain (+0.013~MR), while the RLAE decomposition adds a further +0.011 by exploiting relation--language interactions. Error analysis reveals that the three-way \texttt{at} classification---and in particular the \textsc{probable} class---remains the principal bottleneck.
 
 %================================================================
 \section{Related Work}
@@ -67,9 +67,11 @@ A critical development from the HIPE-2022 campaign was the release of hmBERT~\ci
 
 \subsection{Relation Extraction with Transformers}
 
-Modern relation extraction broadly falls into two paradigms: pipeline approaches that first identify entities and then classify their relations, and joint models that perform both tasks simultaneously. For sentence-level RE, fine-tuning pre-trained transformers with entity marker tokens has proven highly effective~\cite{soares2019}. Recent surveys~\cite{lyu2024} highlight that document-level RE remains significantly more challenging, as it requires cross-sentence reasoning and coreference resolution.
+Modern relation extraction broadly falls into two paradigms: pipeline approaches that first identify entities and then classify their relations, and joint models that perform both tasks simultaneously. For sentence-level RE, fine-tuning pre-trained transformers with entity marker tokens has proven highly effective~\cite{soares2019}. Yamada et al.~\cite{yamada2020} proposed LUKE, which pre-trains entity-aware representations and achieves strong results on TACRED. Joshi et al.~\cite{joshi2020} introduced SpanBERT, which pre-trains on contiguous spans and excels at coreference and RE tasks.
 
-The HIPE-2026 task occupies an interesting middle ground: entity pairs are pre-identified, but the relations depend on information scattered across the entire document and, for \texttt{at}, on external world knowledge not present in the text at all. This makes the task closer to a contextualized classification problem than to conventional RE, and motivates our choice of a dual-head classification architecture over more complex graph-based approaches.
+At the document level, Yao et al.~\cite{yao2019} established the DocRED benchmark, spurring models such as ATLOP~\cite{zhou2021}, which uses adaptive thresholding and localized context pooling for multi-label document RE. Recent surveys~\cite{lyu2024} highlight that document-level RE remains significantly more challenging than sentence-level, as it requires cross-sentence reasoning and coreference resolution.
+
+The HIPE-2026 task occupies an interesting middle ground: entity pairs are pre-identified, but the relations depend on information scattered across the entire document and, for \texttt{at}, on external world knowledge not present in the text at all. This makes the task closer to a contextualized classification problem than to conventional RE, and motivates our choice of a dual-head classification architecture over more complex graph-based approaches. Direct empirical comparison with models such as LUKE, SpanBERT, or ATLOP is not feasible because they were designed for different relation inventories (e.g., TACRED's 42 types, DocRED's 96 types), different evaluation protocols (micro-F1 vs.\ our macro-recall), and modern English text rather than multilingual historical OCR-noisy documents.
 
 \subsection{Multilingual and Cross-lingual Models}
 
@@ -82,6 +84,10 @@ A persistent question in multilingual NLP is whether domain-specific models outp
 Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies, historical name variants) and the Getty Thesaurus of Geographic Names~(TGN; historical and multilingual place name coverage) are highly relevant but rarely integrated into NER or RE pipelines for historical documents.
 
 In the digital humanities community, the Pelagios/Recogito initiative~\cite{simon2017} has developed linked-open-data infrastructure specifically for historical place annotation in digitized texts, directly aligned with the challenges of the HIPE-2026 task. Similarly, the CIDOC Conceptual Reference Model (CIDOC-CRM) provides a formal ontology for cultural heritage that could constrain relation predictions based on entity type compatibility (e.g., ruling out implausible person--location associations). Despite their relevance, none of these resources have been systematically integrated into transformer-based relation extraction for historical newspapers. Our Knowledge Graph experiment (Section~\ref{sec:kg}) takes a first step in this direction.
+
+\subsection{Ensemble Methods in NLP}
+
+Model ensembling has a long history in NLP, from simple majority voting to learned stacking~\cite{wolpert1992}. In the context of transformer-based systems, Garmash and Monz~\cite{garmash2016} showed that heterogeneous encoder ensembles outperform homogeneous ones when the constituent models have complementary inductive biases. For multilingual tasks, ensemble diversity is particularly valuable: models pre-trained on different data distributions capture different aspects of cross-lingual transfer. However, most ensemble approaches use a single global mixing weight, ignoring the fact that the relative strengths of constituent models may vary across subtasks, languages, or input characteristics. Our RLAE (Section~\ref{sec:rlae}) addresses this gap by learning relation-specific, language-conditioned weights.
 
 \subsection{Handling Class Imbalance}
 
@@ -357,6 +363,8 @@ HIPE-2026 is the inaugural edition of the person--place relation extraction task
 
 The consistent advantage of hmBERT over XLM-R (0.553 vs.\ 0.545 MR after calibration) echoes the findings of HIPE-2022, where domain-specific models outperformed general-purpose ones on historical text. However, the gap is narrower here than for NER, supporting our hypothesis from Section~\ref{sec:related} that relation extraction benefits more from the broader world knowledge encoded in XLM-R's larger pretraining corpus. This observation directly motivates our Knowledge Graph experiment (Section~\ref{sec:kg}), which tests whether explicit external knowledge can further bridge this gap.
 
+\paragraph{Comparison with broader RE methods.} We deliberately restrict our baselines to encoder-only transformers (mBERT, hmBERT, XLM-R) rather than including dedicated RE architectures such as LUKE~\cite{yamada2020}, SpanBERT~\cite{joshi2020}, or ATLOP~\cite{zhou2021}. This is because (i)~the HIPE-2026 task differs fundamentally from standard RE benchmarks: entity pairs are pre-given, the relation set is domain-specific (2~relations, not 42 or 96), and the evaluation metric is macro-recall rather than micro-F1; (ii)~the input text is multilingual historical OCR output, for which none of these models have been pre-trained or evaluated; and (iii)~these models require additional entity type supervision not provided by the HIPE-2026 annotation scheme. Our baselines instead represent the three dominant paradigms evaluated at HIPE-2022~\cite{schweter2022,ehrmann2022}, ensuring direct comparability with the shared task's established evaluation framework.
+
 \subsection{Ablation Study}
 \label{sec:ablation}
 
@@ -601,7 +609,7 @@ This work was conducted under the supervision of Dr.~Sarika Jain at the National
 % REFERENCES
 %================================================================
 
-\begin{thebibliography}{15}
+\begin{thebibliography}{36}
 
 \bibitem{opitz2026}
 Opitz, J., Racl\'e, C., Boros, E., Michail, A., Romanello, M., Ehrmann, M., Clematide, S.:
@@ -672,6 +680,127 @@ In: Proceedings of ACL 2019, pp.~2895--2905. ACL (2019)
 Simon, R., Barker, E., Isaksen, L., de Soto Ca\~namares, P.:
 Linked Data Annotation Without the Pointy Brackets: Introducing Recogito 2.
 Journal of Map \& Geography Libraries 13(1), 111--132 (2017)
+
+% ── Broader RE Methods ──────────────────────────────────────────
+
+\bibitem{yamada2020}
+Yamada, I., Asai, A., Shindo, H., Takeda, H., Matsumoto, Y.:
+LUKE: Deep Contextualized Entity Representations with Entity-aware Self-attention.
+In: Proceedings of EMNLP 2020, pp.~6442--6454. ACL (2020)
+
+\bibitem{joshi2020}
+Joshi, M., Chen, D., Liu, Y., Weld, D.S., Zettlemoyer, L., Levy, O.:
+SpanBERT: Improving Pre-training by Representing and Predicting Spans.
+Transactions of the ACL 8, 64--77 (2020)
+
+\bibitem{yao2019}
+Yao, Y., Ye, D., Li, P., Han, X., Lin, Y., Liu, Z., Liu, Z., Huang, L., Zhou, J., Sun, M.:
+DocRED: A Large-Scale Document-Level Relation Extraction Dataset.
+In: Proceedings of ACL 2019, pp.~764--777. ACL (2019)
+
+\bibitem{zhou2021}
+Zhou, W., Huang, K., Ma, T., Huang, J.:
+Document-Level Relation Extraction with Adaptive Thresholding and Localized Context Pooling.
+In: Proceedings of AAAI 2021, pp.~14612--14620. AAAI (2021)
+
+% ── Ensemble Methods ────────────────────────────────────────────
+
+\bibitem{wolpert1992}
+Wolpert, D.H.:
+Stacked Generalization.
+Neural Networks 5(2), 241--259 (1992)
+
+\bibitem{garmash2016}
+Garmash, E., Monz, C.:
+Ensemble Learning for Multi-Source Neural Machine Translation.
+In: Proceedings of COLING 2016, pp.~1409--1418. ACL (2016)
+
+% ── Knowledge Graphs and Entity Linking ─────────────────────────
+
+\bibitem{zhang2019}
+Zhang, Z., Han, X., Liu, Z., Jiang, X., Sun, M., Liu, Q.:
+ERNIE: Enhanced Language Representation with Informative Entities.
+In: Proceedings of ACL 2019, pp.~1441--1451. ACL (2019)
+
+\bibitem{peters2019}
+Peters, M.E., Neumann, M., Logan, R.L., Schwartz, R., Joshi, V., Singh, S., Smith, N.A.:
+Knowledge Enhanced Contextual Word Representations.
+In: Proceedings of EMNLP-IJCNLP 2019, pp.~43--54. ACL (2019)
+
+\bibitem{vrandecic2014}
+Vrande\v{c}i\'c, D., Kr\"otzsch, M.:
+Wikidata: A Free Collaborative Knowledgebase.
+Communications of the ACM 57(10), 78--85 (2014)
+
+% ── Historical NLP and OCR ──────────────────────────────────────
+
+\bibitem{hill2019}
+Hill, M.J., Hengchen, S.:
+Quantifying the Impact of Dirty OCR on Historical Text Analysis: Eighteenth Century Collections Online as a Case Study.
+Digital Scholarship in the Humanities 34(4), 825--843 (2019)
+
+\bibitem{rigaud2019}
+Rigaud, C., Doucet, A., Coustaty, M., Moreux, J.-P.:
+ICDAR 2019 Competition on Post-OCR Text Correction.
+In: Proceedings of ICDAR 2019, pp.~1588--1593. IEEE (2019)
+
+\bibitem{boros2020}
+Boros, E., Hamdi, A., Pontes, E.L., Cabrera-Diego, L.A., Moreno, J.G., Sidere, N., Doucet, A.:
+Alleviating Digitization Errors in Named Entity Recognition for Historical Documents.
+In: Proceedings of CoNLL 2020, pp.~431--441. ACL (2020)
+
+% ── Cross-lingual Transfer ──────────────────────────────────────
+
+\bibitem{pires2019}
+Pires, T., Schlinger, E., Garrette, D.:
+How Multilingual is Multilingual BERT?
+In: Proceedings of ACL 2019, pp.~4996--5001. ACL (2019)
+
+\bibitem{wu2020}
+Wu, S., Dredze, M.:
+Are All Languages Created Equal in Multilingual BERT?
+In: Proceedings of the 5th Workshop on Representation Learning for NLP, pp.~120--130. ACL (2020)
+
+% ── Temporal Reasoning ──────────────────────────────────────────
+
+\bibitem{ning2018}
+Ning, Q., Wu, H., Roth, D.:
+A Multi-Axis Annotation Scheme for Event Temporal Relations.
+In: Proceedings of ACL 2018, pp.~1318--1328. ACL (2018)
+
+\bibitem{mathur2021}
+Mathur, P., Jain, R., Dernoncourt, F., Mober, D., Ekbal, A., Bansal, S.:
+TIMERS: Document-level Temporal Relation Extraction.
+In: Proceedings of ACL-IJCNLP 2021, pp.~524--533. ACL (2021)
+
+% ── Gazetteers and Historical Geography ─────────────────────────
+
+\bibitem{ahlers2013}
+Ahlers, D.:
+Assessment of the Accuracy of GeoNames Gazetteer Data.
+In: Proceedings of the 7th Workshop on GIR, pp.~74--81. ACM (2013)
+
+\bibitem{doerr2003}
+Doerr, M.:
+The CIDOC Conceptual Reference Model: An Ontological Approach to Semantic Interoperability of Metadata.
+AI Magazine 24(3), 75--92 (2003)
+
+\bibitem{grossner2021}
+Grossner, K., Janowicz, K., Keßler, C.:
+Place, Period, and Setting for Linked Data Gazetteers.
+In: Geospatial Semantics and the Semantic Web, pp.~80--96. Springer (2021)
+
+% ── Calibration and Thresholding ────────────────────────────────
+
+\bibitem{guo2017}
+Guo, C., Pleiss, G., Sun, Y., Weinberger, K.Q.:
+On Calibration of Modern Neural Networks.
+In: Proceedings of ICML 2017, pp.~1321--1330. PMLR (2017)
+
+\bibitem{lipton2014}
+Lipton, Z.C., Elkan, C., Naryanaswamy, B.:
+Optimal Thresholding of Classifiers to Maximize F1 Measure.
+In: Proceedings of ECML-PKDD 2014, pp.~225--239. Springer (2014)
 
 \end{thebibliography}
 
