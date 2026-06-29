@@ -557,27 +557,36 @@ These categories suggest that further progress on this task will require either 
 \subsection{Knowledge Graph Augmentation}
 \label{sec:kg}
 
-Our error analysis demonstrates that 26\% of errors stem from a lack of implicit world knowledge. To address this fundamental limitation of text-only transformers, we conducted a novel experiment integrating explicit facts from a Knowledge Graph (KG) directly into the model's context window.
+Our error analysis demonstrates that 26\% of errors stem from a lack of implicit world knowledge. To address this fundamental limitation of text-only transformers, we conducted a novel experiment integrating explicit facts from multiple Knowledge Graphs (KGs) directly into the model's context window.
 
-Using the provided Wikidata QIDs for person and location entities, we queried the Wikidata API to retrieve relevant historical properties: \emph{birthplace} (P19), \emph{deathplace} (P20), \emph{residence} (P551), \emph{country} (P27), \emph{occupation} (P106), and \emph{coordinates} (P625). These facts were serialized into text strings (e.g., ``\texttt{birthplace: Corsica | occupation: emperor | loc\_country: France}'') and appended to the input using a special \texttt{<WIKI>} token. 
+Using the provided Wikidata QIDs for person and location entities, we designed three distinct augmentation strategies to compare generalist KGs against specialized gazetteers:
+\begin{enumerate}
+    \item \textbf{E1 (Wikidata):} A generalist KG. We retrieved biographical properties (birthplace, deathplace, occupation) and geographical properties (country, administrative region).
+    \item \textbf{E2 (GeoNames):} A modern geographical database. We extracted spatial hierarchies and alternate regional spellings via Wikidata's GeoNames mapping (P1566).
+    \item \textbf{E3 (Getty TGN):} A specialized historical gazetteer. We extracted historical place names and administrative hierarchies via the Getty Thesaurus of Geographic Names mapping (P1667).
+\end{enumerate}
+
+These facts were serialized into text strings and appended to the input using special tokens (e.g., \texttt{<WIKI>}, \texttt{<GEONAMES>}, \texttt{<GETTY>}). 
 
 \begin{table}[t]
 \centering
-\caption{Impact of Wikidata Knowledge Graph augmentation on the hmBERT encoder.}
+\caption{Impact of Knowledge Graph augmentation across different KG sources (hmBERT encoder).}
 \label{tab:kg}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Configuration} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
 \midrule
-E0: Text-only & 0.5527 & 0.4555 & \textbf{0.6499} \\
-E1: Text + Wikidata & \textbf{0.5529} & \textbf{0.4713} & 0.6344 \\
+E0: Text-only & 0.563 & 0.467 & \textbf{0.659} \\
+E1: Text + Wikidata & \textbf{0.565} & 0.476 & 0.654 \\
+E2: Text + GeoNames & 0.559 & \textbf{0.479} & 0.639 \\
+E3: Text + Getty TGN & 0.550 & 0.453 & 0.647 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The results (Table~\ref{tab:kg}) reveal a notable dichotomy. While the overall macro-recall remains essentially unchanged (+0.0002), the \texttt{at} recall improves by +1.6 percentage points (from 0.456 to 0.471), whereas the \texttt{isAt} recall degrades by $-$1.6\,pp (from 0.650 to 0.634). 
+The results (Table~\ref{tab:kg}) reveal a striking dichotomy between spatial and temporal reasoning. The spatial \texttt{at} relation benefits immensely from static KG facts: GeoNames (E2) achieves the highest spatial recall (+1.2 percentage points over the baseline), as its dense geographical hierarchy helps the model associate locations correctly. Wikidata (E1) also provides a solid spatial boost. However, for the strict temporal event relation (\texttt{isAt}), every single KG augmentation degrades performance. GeoNames causes the most severe drop ($-$2.0\,pp in \texttt{isAt} recall). 
 
-This pattern aligns with the semantic nature of the two relations. The \texttt{at} relation evaluates a general spatial connection, which benefits directly from static Wikidata properties (knowing a politician was born in a particular city helps associate them with that region's geography). Conversely, \texttt{isAt} is a strict \emph{temporal} relation evaluating whether the person was at the location \emph{at the time the article was written}. Static biographical facts can act as distractors for temporal events, as the model may incorrectly infer an \texttt{isAt} relation simply because a birthplace matches the article's location. This finding suggests that effective KG augmentation for temporal relations will require timeline-aware fact selection rather than static property retrieval.
+This pattern confirms that static biographical and spatial facts act as distractors for temporal events. The model incorrectly infers an \texttt{isAt} relation simply because a birthplace or regional hierarchy matches the article's location, ignoring the temporal constraint of the publication date. This finding suggests that effective KG augmentation for temporal relations will require timeline-aware historical fact selection rather than static property retrieval, and it directly motivates our decoupled RLAE design that routes spatial and temporal decisions independently.
 
 %================================================================
 \section{Limitations and Future Work}

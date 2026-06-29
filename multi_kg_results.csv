@@ -1,0 +1,5 @@
+Experiment,MR,at_recall,isAt_recall
+E0_text_only,0.5631,0.4673,0.6589
+E1_text_wikidata,0.5648,0.4756,0.654
+E2_text_geonames,0.559,0.4793,0.6386
+E3_text_getty,0.55,0.4531,0.6468
