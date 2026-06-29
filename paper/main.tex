@@ -52,6 +52,13 @@ In this work we present MHIPEX (\textbf{M}ultilingual \textbf{H}istorical \textb
 
 Our results show that MHIPEX-RLAE achieves a macro-recall (MR) of 0.5767 on the development set (95\% CI: $[0.548, 0.604]$), a substantial improvement over each individual baseline and +0.011 over the fixed-weight ensemble. Through ablation we find that the ensemble provides the single largest architectural gain (+0.013~MR), while the RLAE decomposition adds a further +0.011 by exploiting relation--language interactions. Error analysis reveals that the three-way \texttt{at} classification---and in particular the \textsc{probable} class---remains the principal bottleneck.
 
+Most critically, this paper moves beyond simply describing a shared-task submission to presenting a standalone framework for historical relation extraction. Our specific contributions include:
+\begin{enumerate}
+    \item The introduction of \textbf{RLAE (Relation-Specific Language-Adaptive Ensemble)}, a conditional Mixture-of-Experts approach that learns decoupled mixing weights for relation types and languages without requiring end-to-end retraining.
+    \item A rigorous \textbf{empirical comparison of Knowledge Graph sources} (including Wikidata, GeoNames, and Getty TGN), demonstrating the fundamental dichotomy between static and temporal knowledge augmentation.
+    \item Comprehensive \textbf{generalization and cross-lingual zero-shot transfer} experiments that establish the baseline robustness of multilingual transformers on historical texts.
+\end{enumerate}
+
 %================================================================
 \section{Related Work}
 \label{sec:related}
@@ -303,7 +310,7 @@ Table~\ref{tab:main} presents the main results on the HIPE-2026 sandbox developm
 
 \begin{table}[t]
 \centering
-\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. MR is computed from unrounded per-class recalls; displayed values are individually rounded to three decimal places.}
+\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. MR is computed from unrounded per-class recalls; displayed values are individually rounded to three decimal places. Unrounded arithmetic: for hmBERT$^{\dagger}$, MR\_at=0.4502 and MR\_isAt=0.6558 yields MR=0.5530.}
 \label{tab:main}
 \begin{tabular}{llccc}
 \toprule
@@ -383,7 +390,8 @@ A1 & + DATE/LANG tokens & 0.546 & +0.008 \\
 A2 & + Multi-sample dropout ($K$=3) & 0.546 & --- \\
 A3 & + CLS+Mean dual pooling & 0.546 & --- \\
 A4 & + Threshold calibration & 0.553 & +0.007 \\
-A5 & + XLM-R ensemble ($\beta$=0.60) & 0.566 & +0.013 \\
+A5a & + XLM-R ensemble (uniform $\beta$=0.50) & 0.559 & +0.006 \\
+A5b & + XLM-R ensemble (optimized $\beta$=0.60) & 0.566 & +0.007 \\
 A6 & + RLAE (per-lang, per-rel $\beta$) & \textbf{0.577} & +0.011 \\
 \bottomrule
 \end{tabular}
@@ -469,7 +477,7 @@ German & 0.60 & 0.30 & 0.4979 & 0.6366 \\
 \end{tabular}
 \end{table}
 
-The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
+The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). As established in Section~\ref{sec:results}, German's single-model \texttt{isAt} performance on hmBERT was exceptionally weak (MR=0.599, well below the 0.672 ensemble average); RLAE automatically mitigates this by routing 70\% of the German \texttt{isAt} decision weight to XLM-R. We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
 
 This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
