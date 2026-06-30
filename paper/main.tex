@@ -20,7 +20,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents MHIPEX, a general knowledge-aware framework for person--place relation extraction from multilingual historical newspapers. Evaluated in the context of the CLEF HIPE-2026 shared task, MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy: static Wikidata facts improve spatial relation extraction (\texttt{at} recall +1.6\,pp) but degrade temporal event detection (\texttt{isAt} recall $-$1.6\,pp), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields a macro-recall of 0.588, confirming the robustness of the framework for broader multilingual historical relation extraction tasks.
+This paper presents MHIPEX, a general knowledge-aware framework for person--place relation extraction from multilingual historical newspapers. Evaluated in the context of the CLEF HIPE-2026 shared task, MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy: static gazetteer facts (GeoNames) improve spatial relation extraction (\texttt{at} recall +1.2\,pp) but degrade temporal event detection (\texttt{isAt} recall $-$2.0\,pp), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields a macro-recall of 0.588, confirming the robustness of the framework for broader multilingual historical relation extraction tasks.
 \end{abstract}
 
 \keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and Knowledge Graphs \and CLEF HIPE-2026}
@@ -174,7 +174,7 @@ Figure~\ref{fig:arch} illustrates the MHIPEX pipeline, which consists of four st
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.95\textwidth]{figures/architecture.png}
+\includegraphics[width=0.95\textwidth]{figures/architecture1.png}
 \caption{Overview of the MHIPEX pipeline. The input is enriched with date and language tokens, processed by two complementary encoders (hmBERT and XLM-R) with dual pooling and multi-sample dropout, and fused via weighted soft voting with threshold calibration.}
 \label{fig:arch}
 \end{figure}
@@ -399,7 +399,7 @@ A6 & + RLAE (per-lang, per-rel $\beta$) & \textbf{0.577} & +0.011 \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.85\textwidth]{figures/fig5_ablation.png}
+\includegraphics[width=0.85\textwidth]{figures/fig5_ablation1.png}
 \caption{Cumulative ablation on hmBERT. Input enrichment and threshold calibration provide measurable MR gains, while the XLM-R ensemble yields the single largest improvement (+0.013).}
 \label{fig:ablation}
 \end{figure}
@@ -616,7 +616,7 @@ We identify several limitations of the current work, each pointing to concrete d
 
 We have presented MHIPEX, a general framework for person--place relation extraction from multilingual historical newspapers. Evaluated within the rigorous CLEF HIPE-2026 shared task setting, our findings demonstrate that multilingual transformers effectively model these complex relations (RQ1) and that input enrichment with date and language tokens provides consistent gains (RQ2). Furthermore, combining hmBERT and XLM-R yields complementary improvements (RQ3), though the ambiguous \textsc{probable} class remains the primary bottleneck (RQ4). Most significantly, our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that conditional adaptive fusion is highly beneficial (RQ5). Overall, MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and proves its broad applicability with a domain transfer MR of 0.588 on newspaper v1.0.
 
-The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static Wikidata facts improve spatial reasoning (+1.6\,pp) but degrade temporal reasoning ($-$1.6\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
+The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static gazetteer facts (GeoNames) improve spatial reasoning (+1.2\,pp) but degrade temporal reasoning ($-$2.0\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
 
 Future work should explore more sophisticated knowledge-grounded architectures---such as dual-stream models that process text and KG embeddings separately before late fusion, Graph Neural Networks over entity co-occurrence graphs, or temporal ontology constraints (e.g., CIDOC-CRM~\cite{doerr2003}, Pelagios~\cite{simon2017})---to integrate external facts without losing temporal precision. Additionally, synthetic OCR noise augmentation~\cite{boros2020} during fine-tuning could directly address the remaining character-level corruption errors.
 
