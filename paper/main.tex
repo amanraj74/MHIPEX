@@ -59,6 +59,8 @@ Most critically, this paper moves beyond simply describing a shared-task submiss
     \item Comprehensive \textbf{generalization and cross-lingual zero-shot transfer} experiments that establish the baseline robustness of multilingual transformers on historical texts.
 \end{enumerate}
 
+While the individual components of MHIPEX---historically pre-trained transformers, class-weighted cross-entropy, and basic ensembling---are established techniques, the genuine methodological novelty of our framework lies in the RLAE architecture. By decomposing the ensemble conditionally on both relation type and source language, RLAE achieves the benefits of a Mixture-of-Experts routing network without requiring end-to-end retraining.
+
 %================================================================
 \section{Related Work}
 \label{sec:related}
@@ -299,7 +301,7 @@ Gradient clipping & 0.5 & 0.5 \\
 
 \subsection{Hardware and Reproducibility}
 
-All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise. The RLAE procedure (Section~\ref{sec:rlae}) is applied post-hoc on saved probability tensors and does not require retraining. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanraj74/MHIPEX}.
+All experiments were conducted on Kaggle using two NVIDIA Tesla T4 GPUs (16\,GB each) with PyTorch 2.x and Transformers 4.44.2. Training time was approximately 35 minutes per model (total inference: $\sim$3 seconds for 2{,}081 dev pairs on a single T4). The combined ensemble (hmBERT + XLM-R) requires 388M parameters and 70 minutes of total training. While this effectively doubles the training cost compared to a single encoder, the architectural gain of +0.024 MR (from the hmBERT baseline to RLAE) provides a favorable cost-performance trade-off for high-accuracy historical extraction tasks where inference time is not a strict real-time constraint. All reported numbers are from a single run with fixed random seed 42; across three runs with seeds \{42, 123, 7\}, hmBERT MR varied by $\pm$0.003, suggesting the reported gains of +0.007 (calibration) and +0.013 (ensemble) are above run-to-run noise. The RLAE procedure (Section~\ref{sec:rlae}) is applied post-hoc on saved probability tensors and does not require retraining. Threshold calibration is performed on the same development set used for final evaluation; this is explicitly acknowledged as a limitation in Section~\ref{sec:limitations}. Code is available at \url{https://github.com/amanraj74/MHIPEX}.
 
 %================================================================
 \section{Results and Analysis}
@@ -464,7 +466,7 @@ Table~\ref{tab:rlae} reports the per-language mixing weights learned by RLAE (Eq
 
 \begin{table}[t]
 \centering
-\caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$.}
+\caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$. We note that English weights are estimated on a very small sample (151 development pairs) and should be interpreted with appropriate caution until validated on additional datasets.}
 \label{tab:rlae}
 \begin{tabular}{lcccc}
 \toprule
@@ -599,7 +601,7 @@ We identify several limitations of the current work, each pointing to concrete d
 
 \textbf{L2: Limited language coverage.} MHIPEX was evaluated on English, French, and German only. The HIPE-2026 framework also includes Luxembourgish, and many European newspaper archives cover additional languages (Dutch, Italian, Swedish). Extending the system to these languages would test the true generalizability of our approach.
 
-\textbf{L3: No external knowledge integration.} Our initial Knowledge Graph experiment (Section~\ref{sec:kg}) proves that external facts improve spatial reasoning but harm temporal reasoning. A more sophisticated architecture---such as a Graph Neural Network (GNN) or a dual-stream model that processes text and KG embeddings separately before late fusion---could better leverage external knowledge without confusing temporal context.
+\textbf{L3: No external knowledge integration.} Our initial Knowledge Graph experiment (Section~\ref{sec:kg}) indicates that external facts improve spatial reasoning but harm temporal reasoning. A more sophisticated architecture---such as a Graph Neural Network (GNN) or a dual-stream model that processes text and KG embeddings separately before late fusion---could better leverage external knowledge without confusing temporal context.
 
 \textbf{L4: Weak performance on the \textsc{probable} class.} The three-way \texttt{at} classification achieves only 25.9\% recall on \textsc{probable}, dragging down overall macro-recall. This class is inherently ambiguous---annotators themselves may disagree on the boundary between \textsc{probable} and \textsc{true}. Ordinal regression or label smoothing may better capture this gradedness than standard cross-entropy.
 
@@ -614,7 +616,7 @@ We identify several limitations of the current work, each pointing to concrete d
 \label{sec:conclusion}
 %================================================================
 
-We have presented MHIPEX, a general framework for person--place relation extraction from multilingual historical newspapers. Evaluated within the rigorous CLEF HIPE-2026 shared task setting, our findings demonstrate that multilingual transformers effectively model these complex relations (RQ1) and that input enrichment with date and language tokens provides consistent gains (RQ2). Furthermore, combining hmBERT and XLM-R yields complementary improvements (RQ3), though the ambiguous \textsc{probable} class remains the primary bottleneck (RQ4). Most significantly, our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that conditional adaptive fusion is highly beneficial (RQ5). Overall, MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and proves its broad applicability with a domain transfer MR of 0.588 on newspaper v1.0.
+We have presented MHIPEX, a general framework for person--place relation extraction from multilingual historical newspapers. Evaluated within the rigorous CLEF HIPE-2026 shared task setting, our findings suggest that multilingual transformers effectively model these complex relations (RQ1) and that input enrichment with date and language tokens provides consistent gains (RQ2). Furthermore, combining hmBERT and XLM-R yields complementary improvements (RQ3), though the ambiguous \textsc{probable} class remains the primary bottleneck (RQ4). Most significantly, our proposed Relation-Specific Language-Adaptive Ensemble (RLAE) outperforms the fixed-weight ensemble by +0.011~MR, confirming that conditional adaptive fusion is highly beneficial (RQ5). Overall, MHIPEX-RLAE achieves a macro-recall of 0.5767 (95\% CI: $[0.548, 0.604]$) on the sandbox development data---a 35.1\% relative improvement over mBERT---and suggests its broad applicability with a domain transfer MR of 0.588 on newspaper v1.0.
 
 The RLAE analysis reveals a key insight: while spatial relations (\texttt{at}) consistently prefer hmBERT across all languages, the optimal encoder for temporal relations (\texttt{isAt}) varies by language---English favors hmBERT ($\beta=0.70$) while French and German favor XLM-R ($\beta \leq 0.35$). This pattern was predicted by our Knowledge Graph experiment, which demonstrated that static gazetteer facts (GeoNames) improve spatial reasoning (+1.2\,pp) but degrade temporal reasoning ($-$2.0\,pp), and it generalizes the spatial--temporal dichotomy into a concrete algorithmic contribution.
 
