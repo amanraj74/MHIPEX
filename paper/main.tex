@@ -259,6 +259,36 @@ The key insight motivating RLAE is empirical: our KG experiment demonstrates tha
 
 From a theoretical perspective, RLAE can be understood as a conditional Mixture-of-Experts~\cite{garmash2016} where the gating function is conditioned on observable metadata (language tag and relation type) rather than on learned input features. By partitioning the prediction space into more homogeneous subsets, per-group optimization reduces within-group ensemble variance without the overfitting risk of fully learned gating on small data. Unlike attention-based fusion, this approach yields interpretable, transparent weights that directly reveal which encoder dominates for each condition. Importantly, RLAE operates entirely as a post-hoc procedure on saved probability tensors and requires no model retraining.
 
+The full procedure is formalized in Algorithm~\ref{alg:rlae}.
+
+\begin{figure}[t]
+\begin{small}
+\begin{tabbing}
+\textbf{Algorithm 1: RLAE — Post-hoc Relation-Specific Language-Adaptive Ensemble} \\[4pt]
+\textbf{Input:} \= Saved probability tensors $\mathbf{P}_\text{hmBERT}$, $\mathbf{P}_\text{XLM-R}$ on dev set; \\
+                \> Dev set labels $\mathbf{Y}$ with language tag $\ell$ per example \\
+\textbf{Output:} Optimal weight matrix $B \in \mathbb{R}^{|\mathcal{R}| \times |\mathcal{L}|}$, threshold matrix $T \in \mathbb{R}^{|\mathcal{R}| \times 3}$ \\[6pt]
+1: \textbf{for} $r \in \{\texttt{at}, \texttt{isAt}\}$ \textbf{do} \\
+2: \quad \textbf{for} $\ell \in \{\text{en}, \text{fr}, \text{de}\}$ \textbf{do} \\
+3: \quad\quad $\mathcal{D}_{\ell} \leftarrow \{(i,y_i) : \text{lang}(i) = \ell\}$ \hspace{2em} \emph{// partition dev by language} \\
+4: \quad\quad \textbf{for} $\beta \in \{0.0, 0.1, \ldots, 1.0\}$ \textbf{do} \\
+5: \quad\quad\quad $\hat{\mathbf{p}} \leftarrow \beta \cdot \mathbf{P}^{(r)}_{\text{hmBERT},\ell} + (1-\beta)\cdot \mathbf{P}^{(r)}_{\text{XLM-R},\ell}$ \\
+6: \quad\quad\quad Search $(\tau_p, \tau_t, \tau_i) \in \mathcal{T}$ maximising $\text{MacroRecall}(\hat{\mathbf{p}}, \mathbf{Y}_\ell^{(r)})$ \\
+7: \quad\quad \textbf{end for} \\
+8: \quad\quad $B[r][\ell] \leftarrow \arg\max_\beta \text{MR}$ \hspace{2em} \emph{// store optimal weight} \\
+9: \quad\quad $T[r][\ell] \leftarrow (\tau_p^*, \tau_t^*, \tau_i^*)$ \hspace{2.8em} \emph{// store optimal thresholds} \\
+10: \quad \textbf{end for} \\
+11: \textbf{end for} \\
+12: \textbf{return} $B$, $T$ \\[4pt]
+\emph{Complexity:} $|\mathcal{R}| \times |\mathcal{L}| \times |\mathcal{B}| \times |\mathcal{T}|$ forward passes over dev set probabilities; \\
+\hspace{2.8em} no gradient computation; total runtime $< 5$ seconds on CPU.
+\end{tabbing}
+\end{small}
+\label{alg:rlae}
+\end{figure}
+
+
+
 %================================================================
 \section{Experimental Setup}
 \label{sec:setup}
