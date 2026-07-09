@@ -13,9 +13,13 @@ with open(TEX_FILE, "r", encoding="utf-8") as f:
 # Build resources list
 resources = [{"main": True, "content": tex_content}]
 
-# Add ALL images from figures/
+# Add ALL images from figures/ — exclude stale architecture.png (superseded by architecture1.png)
+EXCLUDE_FIGURES = {"architecture.png", "fig5_ablation.png"}
 for img_path in glob.glob(os.path.join(FIG_DIR, "*.png")):
     fname = os.path.basename(img_path)
+    if fname in EXCLUDE_FIGURES:
+        print(f"  Skipped (stale): figures/{fname}")
+        continue
     with open(img_path, "rb") as f:
         img_b64 = base64.b64encode(f.read()).decode("ascii")
     resources.append({"path": f"figures/{fname}", "file": img_b64})

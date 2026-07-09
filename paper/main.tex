@@ -337,6 +337,7 @@ Several observations merit discussion. First, mBERT barely exceeds the majority 
 \textbf{Statistical significance.} Bootstrap resampling (1{,}000 iterations) yields a 95\% confidence interval of $[0.548, 0.604]$ for MHIPEX-RLAE, compared to $[0.524, 0.581]$ for the hmBERT baseline. The RLAE system outperforms the baseline in 86.1\% of bootstrap samples, indicating a strong positive trend, though the improvement does not reach strict significance at $p<0.05$ due to the moderate development set size ($n=2{,}081$).
 
 \subsection{Per-Language Analysis}
+\label{sec:lang}
 
 Table~\ref{tab:lang} disaggregates performance by language.
 
@@ -357,7 +358,7 @@ All & 2{,}081 & 0.566 & 0.459 & 0.672 \\
 \end{tabular}
 \end{table}
 
-French achieves the highest overall MR (0.568), which is expected given that it dominates the training set (72\% of pairs). English, despite having the smallest sample ($n=151$), achieves competitive performance, likely because hmBERT's English pre-training data is relatively clean compared to its French and German historical corpora. German presents an interesting case: it achieves the highest \texttt{at} recall (0.486) but the lowest \texttt{isAt} recall (0.599), as visualized in Figure~\ref{fig:lang}. We hypothesize that German newspaper articles from this period tend to provide more explicit geographical descriptions (aiding \texttt{at} classification) but use more ambiguous temporal constructions (hindering \texttt{isAt}).
+French achieves the highest overall MR (0.568), which is expected given that it dominates the training set (72\% of pairs). English, despite having the smallest sample ($n=151$), achieves competitive performance, likely because hmBERT's English pre-training data is relatively clean compared to its French and German historical corpora. German presents an interesting case: it achieves the highest \texttt{at} recall (0.486) but the lowest \texttt{isAt} recall (0.599), as visualized in Figure~\ref{fig:lang}. We hypothesize that German newspaper articles from this period tend to provide more explicit geographical descriptions (aiding \texttt{at} classification) but use more ambiguous temporal constructions (hindering \texttt{isAt}). These language-specific patterns motivate the out-of-distribution experiments in Section~\ref{sec:crossval}, where we test whether German's \texttt{isAt} weakness persists under zero-shot transfer.
 
 \begin{figure}[t]
 \centering
