@@ -1,0 +1,4 @@
+experiment,encoder,format,MR,at_recall,isAt_recall,tau_p,tau_t,tau_i,time_min
+B0: Soares [E1]/[E2] + hmBERT,bert-base-historic-multilingual-cased,soares,0.5655,0.4665,0.6645,0.55,0.35,0.25,24.1
+B1: Soares [E1]/[E2] + XLM-R,xlm-roberta-base,soares,0.5504,0.4733,0.6275,0.4,0.35,0.4,76.7
+B2: MHIPEX Enriched <DATE>/<LANG> + hmBERT,bert-base-historic-multilingual-cased,enriched,0.5611,0.46,0.6622,0.45,0.35,0.3,16.1
