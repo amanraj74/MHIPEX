@@ -1,0 +1,581 @@
+﻿=== PAGE 1 ===
+Comments 
+
+=== PAGE 2 ===
+We can participate in HIPE 2027. 
+For the time being, we should submit this work in some good journal. 
+ΓùÅ The paper's current form (a shared-task system-description paper) would likely need to 
+be reframed/extended for a journal version. 
+ΓùÅ The journal selected has to be Hybrid OA model, SCI(E)-indexed, no mandatory APC. 
+ΓùÅ There are two options: 
+Γùï SUbmit the current version with some minor revisions to a conference (but cannot 
+be a shared-task system-description paper as we never participated. 
+And Submit extended version to a journal 
+Γùï Submit only one paper to a good journal  
+ 
+Minimum changes required to submit as standalone paper then bound to CLEF: Broader 
+related-work positioning, a fuller comparison against general-purpose RE baselines beyond the 
+shared-task baselines. 
+1. Information Processing & Management (Elsevier)  
+2. Expert Systems With Applications (Elsevier) 
+3. Knowledge-Based Systems (Elsevier) 
+4. IEEE/ACM Transactions on Audio, Speech, and Language Processing (TASLP) 
+5. Computer Speech & Language (Elsevier) 
+ 
+1. Aim/Objective & Contributions ΓÇö 3/5 
+The methodological novelty is incremental rather than algorithmic. The main contribution 
+is the engineering combination of existing techniques (hmBERT, XLM-R, enriched inputs, 
+class-weighted loss, calibration, and soft-voting ensemble) for the HIPE-2026 shared task. The 
+paper should explicitly clarify what is genuinely novel beyond the integration of known 
+components.  
+2. Experimental Design ΓÇö 3/5  
+Baselines (mBERT, hmBERT, XLM-R) are reasonable and fairly constructed (same dual-head 
+architecture, same loss). However: 
+ΓùÅ No baseline isolates class-weighted CE vs. unweighted CE ΓÇö the loss-imbalance design 
+choice itself is never ablated. 
+ΓùÅ No comparison against focal loss (cited in Sec. 2 as the alternative considered, ref 11), 
+despite explicitly raising it. 
+
+=== PAGE 3 ===
+ΓùÅ Ablation (Table 4) only varies hmBERT-side components; XLM-R is added as one 
+monolithic ensembling step (A5), so we cannot tell how much of the gain comes from 
+ensembling vs. simply having two models vs. weighting choice (╬▒=0.60 is also 
+unablated). 
+Suggested SOTA/comparable works for benchmarking (beyond the three baselines already 
+used) (LOOK FOR MORE RELEVANT SOTA PAPERS ON THE SELECTED DATASETS. The 
+evaluation is limited to the HIPE-2026 development set. We have to see whether the proposed 
+approach is expected to generalize beyond this benchmark): 
+1. Schweter et al., hmBERT (already cited, ref 4) ΓÇö used as encoder but not compared as 
+a fine-tuned-from-scratch RE baseline with a different ensembling strategy. 
+2. Soares et al., "Matching the Blanks" (entity-marker relation extraction) ΓÇö directly relevant 
+to the "entity marker tokens" claim in Sec. 2, currently misattributed (see Set A.7). 
+3. Xu et al., document-level RE with cross-sentence reasoning (already cited, ref 9) ΓÇö 
+should be empirically compared, not just discussed, since HIPE-2026 is framed as 
+adjacent to document-level RE. 
+4. A focal-loss variant of the same architecture (ref 11) ΓÇö the paper claims class-weighted 
+CE was chosen over focal loss based on prior literature, but never empirically validates 
+this for the HIPE-2026 setting. 
+3. Correctness and Anomalies ΓÇö 2/5  
+Found concrete, unresolved arithmetic inconsistencies in Table 3. Since MR is defined as the 
+average of MR_at and MR_isAt, the reported values in Table 3 should satisfy this relationship 
+exactly (up to rounding). Several rows do not, suggesting transcription or reporting errors rather 
+than numerical rounding. These inconsistencies should be corrected before publication. : 
+ΓùÅ hmBERT (Single): MR = 0.546, MR_at = 0.450, MR_isAt = 0.655 ΓåÆ average = 
+(0.450+0.655)/2 = 0.5525, not 0.546. 
+ΓùÅ hmBERTΓÇá (+Calibr.): MR = 0.553, with the same MR_at = 0.450 and MR_isAt = 0.655 as 
+the uncalibrated row. By the paper's own metric definition (Eq. 1), MR must equal the 
+average of MR_at and MR_isAt ΓÇö it cannot change from 0.546 to 0.553 while both 
+component recalls stay fixed. This is mathematically inconsistent. 
+ΓùÅ XLM-R (Single): MR = 0.538, MR_at = 0.447, MR_isAt = 0.643 ΓåÆ average = 0.545, not 
+0.538. The calibrated row (XLM-RΓÇá) then reports MR = 0.545 with the identical 
+MR_at/MR_isAt ΓÇö i.e., the "0.545" appears to belong to the Single row, not the 
+Calibrated row. 
+ΓùÅ This pattern strongly suggests transcription errors when populating Table 3 (likely the 
+Single and Calibrated MR values were swapped or miscopied), not just rounding noise. 
+Additionally, Figure 3 reports MR_isAt = 0.610 for "hmBERT v8 (baseline)," which does not 
+match any value in Table 3 or Table 4 (hmBERT enriched = 0.655 in both). Figure 3's "XLM-R 
+base (fine-tuned)" bar (0.545/0.447/0.643) matches the calibrated XLM-R row in Table 3, not 
+the "Single" row (0.538) it's apparently meant to represent. These figure/table mismatches need 
+to be resolved before publication. 
+4. Generalizability ΓÇö 4/5  
+
+=== PAGE 4 ===
+This is already good. 
+5. Reproducibility ΓÇö 3/5  
+The actual selected threshold values (╧ä_p, ╧ä_t, ╧ä_i) from the grid search (Sec. 3.5) are never 
+reported, only the search ranges ΓÇö this is a meaningful reproducibility gap since calibration is 
+claimed as a measurable contributor (+0.007 MR). No code/data availability statement is 
+present. 
+Require github repo. The manuscript does not specify: 
+ΓùÅ random seeds, 
+ΓùÅ number of training runs, 
+ΓùÅ hardware used, 
+ΓùÅ total training time, 
+ΓùÅ inference time, 
+ΓùÅ whether the reported numbers are from a single run or averaged. 
+These details are important for reproducibility. 
+ 
+6. References ΓÇö 2.5/5 
+ΓùÅ Reference 6 (Devlin et al., BERT, NAACL 2019) is cited in Sec. 2 to support the claim 
+that "fine-tuning pre-trained transformers with entity marker tokens has proven highly 
+effective at the sentence level." The original BERT paper does not introduce or 
+specifically validate entity-marker-token relation extraction ΓÇö this citation is likely 
+misattributed (the standard reference for entity markers in RE is Soares et al., 2019, 
+"Matching the Blanks," which is missing from the bibliography). 
+ΓùÅ Reference 11 (Lin et al., Focal Loss, ICCV 2017) is cited to support "prior work (11) has 
+found competitive with focal loss when combined with threshold calibration" ΓÇö but ref 11 
+is the original Focal Loss paper, not a comparative study of class-weighted CE vs. focal 
+loss with calibration. This citation appears to support a claim it doesn't actually make. 
+ΓùÅ Reference 10 (Inoue, Multi-Sample Dropout, arXiv 2019) appears in the bibliography but 
+is never cited in-body ΓÇö the multi-sample dropout technique is introduced in Sec. 3.3 
+without an inline citation, even though the reference exists in the list. This should be cited 
+at "We apply multi-sample dropout (K = 3 independent masks)." 
+Section-Wise Issues 
+Title Choices. We can look for more 
+HiPER: An Enriched, Calibrated Transformer Ensemble for PersonΓÇôPlace Relation Extraction 
+from Historical Newspapers" 
+MHIPEX: A Calibrated Transformer Ensemble for Multilingual PersonΓÇôPlace Relation 
+Extraction in Historical Newspapers 
+Section 3 (Dataset and System Description) 
+
+=== PAGE 5 ===
+ΓùÅ Eq. 2 and Eq. 4 both reuse the symbol ╬▒ for two unrelated quantities (pooling 
+interpolation weight = 0.5, and ensemble weight = 0.60). This is a notational clash that 
+could confuse readers comparing equations; recommend renaming one (e.g., ╬▓ for the 
+ensemble weight in Eq. 4). 
+ΓùÅ Sec. 3.5 gives threshold search ranges but never states the final selected ╧ä values ΓÇö 
+add a sentence or table reporting the actual calibrated thresholds.  
+Section 4 (Experimental Setup) The paper doesn't state how the train/dev split interacts with 
+threshold calibration ΓÇö since thresholds are tuned on the same dev set used for reporting MR, 
+this is a form of dev-set leakage that should at minimum be explicitly named as a limitation here 
+(it is only mentioned, briefly, in the Conclusion). 
+Section 5.2 (Ablation and Per-Language) A2 and A3 ("Multi-sample dropout" and 
+"CLS+Mean pooling") show zero measured MR change (Γëê0), yet the paper still claims them as 
+contributions in the abstract/conclusion ("each component contributes measurably").  
+According to Table 4, A2 (multi-sample dropout) and A3 (dual pooling) produce little 
+measurable improvement in MR. Require explaination whether these components 
+primarily improve stability rather than average performance and, if so, provide supporting 
+evidence (e.g., variance across runs). 
+Structure, Flow, and Section Headings 
+1. Limitations should be a separate, labeled subsection, not folded into the final 
+paragraph of the Conclusion. Currently the dev-set leakage caveat and the 3-language 
+caveat are buried as a single paragraph after the summary ΓÇö pulling these into a 
+"Limitations" subsection (common best practice, e.g., ACL-style papers) would make 
+them more visible to reviewers and readers, and is more appropriate than having them 
+appear only at the very end after future work is already discussed. 
+ 
+2. Section 5.2's per-language results (right half of Table 4) sit awkwardly alongside 
+the ablation study (left half). These are two different analyses sharing one 
+table/section. Consider moving the per-language results out of 5.2 and merging them 
+with Section 5.3 (Cross-Dataset and Cross-Lingual Validation), since both address 
+language-level generalization ΓÇö this would create a cleaner "Generalization" section 
+(in-domain per-language performance + cross-dataset transfer + zero-shot transfer) 
+separate from the pure "Ablation" section. 
+ 
+3. The threshold calibration mechanism (Sec. 3.5) is described before the 
+experimental results that motivate it (Sec. 5.1, which shows argmax is suboptimal 
+under imbalance). Readers encounter the calibration procedure without yet knowing 
+why it's needed; a one-sentence forward-reference in 3.5 to the imbalance statistics 
+already established in Sec. 3.1/Table 1 would tighten this rather than relying on the 
+reader to recall those numbers from two pages earlier. 
+ 
+4. Section 2 (Related Work) discusses XLM-R's "broader world knowledge" 
+hypothesis ("we hypothesise complements hmBERT's domain-specific robustness") 
+before any results exist to support or test it. This hypothesis is then revisited in Sec. 
+
+=== PAGE 6 ===
+5.1 ("relation extraction may benefit more from XLM-R's broader world-knowledge 
+representations") and again in Sec. 5.4 (world knowledge as 26% of errors). Consider 
+flagging this explicitly as a hypothesis-to-be-tested in Sec. 2, and then explicitly closing 
+the loop in the Conclusion (currently the Conclusion mentions world-knowledge-driven 
+errors but doesn't tie back to the Sec. 2 hypothesis it originally raised). 
+ 
+Redundancy 
+1. Figure 3 and Figure 4 are substantively redundant. Both show a step-by-step bar 
+chart of MR climbing from a weak baseline to MHIPEX's final ensemble (Fig. 3: mBERT 
+ΓåÆ hmBERT v8 ΓåÆ XLM-R base ΓåÆ hmBERT v12 ΓåÆ MHIPEX; Fig. 4: hmBERT v8 ΓåÆ 
++DATE/LANG ΓåÆ +multi-sample ΓåÆ +CLS+Mean ΓåÆ +threshold calib ΓåÆ +XLM-R 
+ensemble). They tell overlapping stories at different granularities, and ΓÇö per Set A.3 ΓÇö 
+Fig. 3 also contains numbers inconsistent with Table 3. Recommend removing Figure 3 
+and keeping only Figure 4 (the more granular, table-matching ablation chart), with the 
+mBERT/XLM-R-vs-hmBERT comparison handled entirely by Table 3 in prose. 
+ 
+2. The per-language performance gap (German low isAt, English low at) is stated 
+three times with the same underlying numbers: in Sec. 5.2 prose ("German attains the 
+highest at recall (0.486) but the lowest isAt recall (0.599)... English achieves competitive 
+performance (MR = 0.543)"), in the Figure 5 caption, and again in Sec. 5.4 ("consistent 
+with its lower MR_isAt (0.599 vs. 0.672 overall)... consistent with its lower MR_at (0.394 
+vs. 0.459 overall)"). Suggest stating the per-language numbers once in Sec. 5.2, and in 
+Sec. 5.4 referring back ("as established in Sec. 5.2, German's MR_isAt of 0.599 is well 
+below the 0.672 ensemble average") rather than re-deriving/restating the same 
+comparison. 
+ 
+3. The hmBERT-outperforms-larger-XLM-R observation is made twice with 
+near-identical framing: once in Sec. 5.1 ("hmBERT outperforms the larger XLM-R 
+despite having fewer parameters (110M vs. 278M), corroborating the finding of Schweter 
+et al.") and once in Sec. 2 as a forward-looking hypothesis ("hmBERT...demonstrated 
+domain-specific pre-training can outweigh model-scale advantages"). This isn't strictly 
+redundant (hypothesis vs. confirmation) but could be tightened by explicitly 
+cross-referencing rather than re-explaining the Schweter et al. finding in full both times. 
+ 
+ 
+Additionally 
+ΓùÅ The paper reports improvements like +0.007 MR and +0.013 MR. Many reported 
+improvements are relatively small. The paper should report variance across multiple runs 
+or statistical significance to demonstrate that these gains are robust rather than due to 
+random initialization. 
+ΓùÅ The paper introduces an ensemble. However, nowhere does it discuss the additional 
+computational cost. Since the proposed system requires two transformer models and an 
+
+=== PAGE 7 ===
+ensemble, the paper should discuss the trade-off between performance gain and 
+computational cost (training/inference time, GPU memory, parameter count). 
+ΓùÅ Threshold calibration is one of the main contributions. Yet there is almost no qualitative 
+explanation. Since threshold calibration is presented as a major contribution, the paper 
+should include a clearer explanation of why calibration particularly benefits this 
+imbalanced relation extraction task. 
+
+=== PAGE 8 ===
+Journal 
+
+=== PAGE 9 ===
+Idea 1: Retrieve structured information for entities from a Knowledge Graph and 
+inject it into the transformer. 
+Instead of 
+Sentence 
+Γåô 
+Transformer 
+Γåô 
+Classifier 
+ 
+use 
+Sentence 
+      + 
+Entity Linking 
+      + 
+Knowledge Graph 
+Γåô 
+Knowledge-aware Transformer 
+Γåô 
+Relation Classifier 
+ 
+Candidate KGs 
+1. Wikidata Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Probably the best option. 
+Useful properties: 
+ΓùÅ occupation 
+ΓùÅ country 
+ΓùÅ capital 
+ΓùÅ birth place 
+ΓùÅ death place 
+ΓùÅ administrative region 
+ΓùÅ aliases 
+ΓùÅ historical names 
+Example: 
+George Washington 
+ 
+instance of: human 
+occupation: politician 
+country: USA 
+birth place: Virginia 
+ 
+
+=== PAGE 10 ===
+instead of 
+George Washington 
+ 
+could also be a university 
+or a street 
+ 
+2. DBpedia 
+Slightly older but easier to query. 
+Useful for 
+ΓùÅ cities 
+ΓùÅ historical locations 
+ΓùÅ organizations 
+3. GeoNames Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Especially useful for HIPE. 
+Contains 
+ΓùÅ latitude 
+ΓùÅ longitude 
+ΓùÅ alternate spellings 
+ΓùÅ historical names 
+ΓùÅ administrative hierarchy 
+Excellent for 
+Paris 
+Lyon 
+Berlin 
+Vienna 
+ 
+4. Getty Thesaurus of Geographic Names (TGN) 
+Very good for historical places. 
+Contains 
+ΓùÅ historical place names 
+ΓùÅ alternative spellings 
+ΓùÅ multilingual names 
+Perfect for OCR-heavy historical newspapers. 
+5. World Historical Gazetteer 
+
+=== PAGE 11 ===
+Very relevant. 
+Historical 
+place 
+ΓåÆ modern equivalent 
+ΓåÆ historical periods 
+ 
+Excellent for historical NLP. 
+Novel Experiment 
+Compare 
+Text only 
+ 
+vs 
+ 
+Text + Wikidata 
+ 
+vs 
+ 
+Text + GeoNames 
+ 
+vs 
+ 
+Text + Historical Gazetteer 
+Knowledge-Graph-Augmented at Classification 
+Motivation: The authors attribute 26% of manually inspected errors to "implicit world knowledge" ΓÇö 
+cases where the at relation requires facts not stated in the article text (their own example: inferring a 
+politician was "at" the capital from a parliamentary report). This is currently unaddressed; it's only 
+mentioned as future work, never attempted. 
+Proposed experiment: Before classification, link the person and place mentions to external KG entries 
+(Wikidata is the natural choice ΓÇö it has structured properties like P19 place of birth, P20 place of death, 
+P551 residence, P39 position held, which often encode exactly the personΓÇôplace associations the at 
+relation is trying to recover). Retrieve these facts and inject them into the model either as: 
+ΓùÅ (a) a concatenated structured-fact string appended to the input (similar in spirit to their existing 
+<DATE>/<LANG> token enrichment, so it's a natural methodological extension of what they 
+already do), or 
+ΓùÅ (b) a separate small encoder/adapter whose output is fused with the hmBERT/XLM-R 
+representations before the classification head. 
+This is a clean ablation story: "KG-augmented vs. text-only" on exactly the probable/true confusion 
+identified as the dominant error pattern (45.1% probableΓåÆtrue). 
+Several established resources fit the KG based task well, beyond just Wikidata: 
+
+=== PAGE 12 ===
+ΓùÅ Wikidata ΓÇö general-purpose KG, best general fit for personΓåöplace facts (birthplace, residence, 
+career posts) as in Experiment 1 above. 
+ΓùÅ GeoNames ΓÇö a geographic gazetteer/ontology; useful for place disambiguation and normalizing 
+historical place names (helpful since historical place names often differ from modern ones, which 
+the paper doesn't address at all). 
+ΓùÅ VIAF (Virtual International Authority File) ΓÇö authority records for persons, useful for 
+disambiguating person names, especially the "ambiguous entity names" error category they 
+identify (24% of errors, e.g. "George Washington" person/place collision). 
+ΓùÅ Pelagios / Recogito / Peripleo ΓÇö a linked-open-data initiative specifically built for historical 
+geography and place-name annotation in digitized texts; closely aligned with the paper's own 
+domain (historical newspapers) and worth citing as directly relevant prior art the paper currently 
+omits. 
+ΓùÅ CIDOC-CRM ΓÇö a formal ontology for cultural heritage data (events, persons, places, time) used 
+widely in digital humanities; could provide the formal schema for representing the at/isAt 
+relations themselves in a more standardized, interoperable way, rather than the paper's current 
+ad hoc three-way/binary label scheme. 
+ΓùÅ Europeana Data Model (EDM) ΓÇö directly relevant since the paper cites Europeana Newspapers 
+in its own introduction (Sec. 1) as one of the digitization projects motivating this work ΓÇö but 
+never connects back to Europeana's own metadata/entity infrastructure. 
+Tying Experiment 1 to Pelagios/GeoNames/Wikidata, and explicitly citing Pelagios as related work. This 
+would also fix a gap in the current version: the current Related Work section (Sec. 2) cites no 
+knowledge-graph or digital-humanities-gazetteer literature at all, despite the paper's own conclusion 
+calling for exactly this kind of integration. 
+ 
+2: OCR-Noise-Aware Contrastive Robustness Training 
+Motivation: 28% of inspected errors are attributed to OCR corruption (their example: "Philadclphia" for 
+"Philadelphia"). The current pipeline does nothing explicit to address this ΓÇö it relies entirely on 
+hmBERT's historical pre-training to absorb OCR noise implicitly. 
+Proposed experiment: Synthetically inject realistic OCR-style character confusions (common 
+substitutions like rnΓåöm, lΓåö1, cΓåöe, long-sΓåöf, digit/letter swaps) into training data, then train with a 
+contrastive or consistency objective that pulls clean and OCR-corrupted versions of the same entity 
+mention together in representation space. Ablate against the current model to see whether this 
+measurably improves recall specifically on the OCR-corruption-flagged subset of their own 50-example 
+error analysis (which they could re-annotate as a small diagnostic test set ΓÇö itself a methodological 
+contribution, since right now that 50-example analysis is descriptive only, not used as an evaluation set). 
+ 
+The paper itself identifies that many errors require external world knowledge: 
+ΓùÅ George Washington (person vs place) 
+ΓùÅ politicians and capitals 
+ΓùÅ historical place names 
+ΓùÅ OCR-induced ambiguity 
+Currently the model only uses text. 
+
+=== PAGE 13 ===
+ 
+3: Ontology-Constrained Relation Prediction  
+Instead of predicting relations independently, use ontology rules. 
+Example: 
+Suppose 
+Person 
+ 
+isAt 
+ 
+City 
+ 
+is possible. 
+But 
+Person 
+ 
+isAt 
+ 
+River 
+ 
+is impossible. 
+The ontology can eliminate impossible predictions. 
+Example 
+Suppose model predicts 
+Einstein 
+ 
+isAt 
+ 
+Atlantic Ocean 
+ 
+Ontology says 
+Human 
+ 
+cannot be located at 
+ 
+Ocean 
+ 
+
+=== PAGE 14 ===
+Prediction rejected. 
+Or 
+French Parliament 
+ 
+isAt 
+ 
+Paris 
+valid. 
+ 
+Ontology sources 
+CIDOC CRM Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Very famous cultural heritage ontology. 
+Widely used for museums and historical archives. 
+Excellent fit for historical documents. 
+Europeana Data Model 
+Historical archive ontology. 
+Linked Open Data cloud 
+Can connect 
+person 
+ 
+city 
+ 
+organization 
+ 
+country 
+ 
+Experiment 
+Compare 
+Transformer 
+ 
+vs 
+ 
+Transformer + ontology validation 
+ 
+vs 
+ 
+Transformer + ontology inference 
+
+=== PAGE 15 ===
+ 
+This is genuinely novel. 
+4. Another Idea 
+The paper currently trains relation extraction only. 
+Instead, jointly learn 
+NER 
+ 
++ 
+ 
+Relation Extraction 
+ 
++ 
+ 
+Entity Linking 
+ 
+in one model. 
+Document 
+Γåô 
+NER 
+Γåô 
+Entity Linking 
+Γåô 
+Relation Extraction 
+ 
+The linked entity provides knowledge. 
+This has become popular recently and would be much more innovative than simply ensembling two 
+transformers. 
+ 
+5. Retrieval-Augmented Relation Extraction 
+(RAG) 
+When encountering 
+Napoleon 
+ 
+ 
+retrieve 
+
+=== PAGE 16 ===
+Napoleon 
+ 
+French emperor 
+ 
+France 
+ 
+Paris 
+ 
+from Wikidata. 
+Append retrieved facts. 
+Transformer predicts relation. 
+This is becoming popular but is still relatively unexplored for historical newspapers. 
+6. Graph Neural Network over Entities 
+Instead of treating entity pairs independently, 
+construct 
+Document 
+ 
+Γåô 
+ 
+Entity Graph 
+ 
+Γåô 
+ 
+Graph Attention Network 
+ 
+Γåô 
+ 
+Relation Prediction 
+ 
+Nodes 
+person 
+ 
+city 
+ 
+country 
+ 
+organization 
+ 
+Edges 
+co-occurrence 
+
+=== PAGE 17 ===
+ 
+sentence proximity 
+ 
+dependency links 
+ 
+document links 
+ 
+This captures global document context. 
+ 
+Which Knowledge Sources Best Fit This 
+Paper? 
+Resource 
+Suitable 
+Why 
+Wikidata 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Rich semantic facts, multilingual, easy entity 
+linking 
+GeoNames 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Geographical hierarchy and alternate place 
+names 
+Getty TGN 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Historical place names and multilingual 
+variants 
+World Historical 
+Gazetteer 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Designed for historical geographic entities 
+DBpedia 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+General-purpose structured knowledge 
+CIDOC CRM 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Ontology for cultural heritage reasoning 
+Europeana EDM 
+Γ¡ÉΓ¡ÉΓ¡ÉΓ¡É 
+Historical archive semantics 
+ 
+

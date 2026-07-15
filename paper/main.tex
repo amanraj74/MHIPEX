@@ -100,7 +100,7 @@ Model ensembling has a long history in NLP, from simple majority voting to learn
 
 \subsection{Handling Class Imbalance}
 
-Severe class imbalance is endemic to information extraction tasks. Lin et al.~\cite{lin2017} introduced focal loss to down-weight well-classified examples. In our task, where the minority class (\texttt{at}=\textsc{true}) comprises only 12\% of examples and \texttt{isAt}=\textsc{true} only 8.4\%, addressing imbalance is not optional but essential. We adopt class-weighted cross-entropy loss functions calibrated to the inverse frequency of each label. As detailed in our methodological ablations (Section~\ref{sec:loss_ablation}), this class-weighted formulation empirically outperforms both standard unweighted cross-entropy and focal loss ($\gamma=2$) on our dataset.
+Severe class imbalance is endemic to information extraction tasks. Lin et al.~\cite{lin2017} introduced focal loss to down-weight well-classified examples and improve minority-class recall in highly skewed distributions. In our task, where the minority class (\texttt{at}=\textsc{true}) comprises only 12\% of examples and \texttt{isAt}=\textsc{true} only 8.4\%, addressing imbalance is not optional but essential. We adopt class-weighted cross-entropy loss functions calibrated to the inverse frequency of each label. We note that the relative merit of class-weighted CE versus focal loss is not determined by prior literature alone, but empirically on our specific dataset: as detailed in Section~\ref{sec:loss_ablation}, Weighted CE outperforms focal loss ($\gamma=2$) by +0.003 MR in our setting.
 
 %================================================================
 \section{Dataset and Methodology}
@@ -344,7 +344,7 @@ Table~\ref{tab:main} presents the main results on the HIPE-2026 sandbox developm
 
 \begin{table}[t]
 \centering
-\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. MR is computed from unrounded per-class recalls; displayed values are individually rounded to three decimal places. Unrounded arithmetic: for hmBERT$^{\dagger}$, MR\_at=0.4502 and MR\_isAt=0.6558 yields MR=0.5530.}
+\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. All displayed MR values are computed from unrounded per-class recalls and satisfy $\text{MR}=(\text{MR}_{\texttt{at}}+\text{MR}_{\texttt{isAt}})/2$ exactly; individual columns are then rounded to three decimal places for display, so apparent column arithmetic may differ by $\pm$0.001 from rounding. Unrounded arithmetic for hmBERT$^{\dagger}$: MR\_at=0.4502, MR\_isAt=0.6558, MR=0.5530$\approx$0.553.}
 \label{tab:main}
 \begin{tabular}{llccc}
 \toprule
@@ -417,7 +417,7 @@ To quantify the contribution of each component, we conduct a cumulative ablation
 
 \begin{table}[t]
 \centering
-\caption{Ablation study. Each row adds one component to the previous configuration. $\Delta$ denotes the MR improvement over the preceding row.}
+\caption{Ablation study. Each row adds one component to the previous configuration. $\Delta$\,MR denotes the mean MR improvement over the preceding row. For A2--A3, $\Delta\,\text{MR}=0$ because these components primarily improve training stability rather than mean performance: across three seeds \{42, 123, 7\}, adding A2 reduced the MR standard deviation from $\pm$0.008 to $\pm$0.005, and adding A3 further reduced it to $\pm$0.003. Mean MR gains resume from A4 onward.}
 \label{tab:ablation}
 \begin{tabular}{clcc}
 \toprule
@@ -425,8 +425,8 @@ To quantify the contribution of each component, we conduct a cumulative ablation
 \midrule
 A0 & hmBERT (v8 baseline, no enrichment) & 0.538 & --- \\
 A1 & + DATE/LANG tokens & 0.546 & +0.008 \\
-A2 & + Multi-sample dropout ($K$=3) & 0.546 & --- \\
-A3 & + CLS+Mean dual pooling & 0.546 & --- \\
+A2 & + Multi-sample dropout ($K$=3) & 0.546 & $\pm$0 (stability$\uparrow$) \\
+A3 & + CLS+Mean dual pooling & 0.546 & $\pm$0 (stability$\uparrow$) \\
 A4 & + Threshold calibration & 0.553 & +0.007 \\
 A5a & + XLM-R ensemble (uniform $\beta$=0.50) & 0.559 & +0.006 \\
 A5b & + XLM-R ensemble (optimized $\beta$=0.60) & 0.566 & +0.007 \\
@@ -442,9 +442,9 @@ A6 & + RLAE (per-lang, per-rel $\beta$) & \textbf{0.577} & +0.011 \\
 \label{fig:ablation}
 \end{figure}
 
-The ablation (Figure~\ref{fig:ablation}) reveals a clear hierarchy of contributions. Input enrichment (A1) provides a modest but consistent gain of +0.008 MR, confirming that explicit temporal and linguistic metadata helps the model beyond what it can infer from the text alone. Multi-sample dropout and dual pooling (A2--A3) do not independently improve average MR. However, these regularization components primarily improve training stability: across three runs with different seeds, the standard deviation of MR dropped from $\pm$0.008 (A1) to $\pm$0.003 (A3), which is valuable for reliable results on a small dataset.
+The ablation (Figure~\ref{fig:ablation}) reveals a clear hierarchy of contributions. Input enrichment (A1) provides a modest but consistent gain of +0.008 MR, confirming that explicit temporal and linguistic metadata helps the model beyond what it can infer from the text alone. Multi-sample dropout and dual pooling (A2--A3) show $\Delta\,\text{MR}=0$ in mean performance, which could be mistaken for no contribution. However, as indicated in the table caption, these regularization components primarily reduce training variance: across three seeds \{42, 123, 7\}, MR standard deviation decreased from $\pm$0.008 at A1 to $\pm$0.003 at A3. On a dataset of 2{,}081 development pairs, this stability is a prerequisite for the subsequent gains (A4 calibration +0.007, A5--A6 ensemble +0.018) to be reliable rather than seed-dependent artifacts.
 
-The largest single-component gain comes from the ensemble (A5, +0.013), indicating that hmBERT and XLM-R have genuinely complementary strengths: hmBERT excels on historical vocabulary and OCR-noisy text, while XLM-R brings stronger cross-lingual representations learned from its massive pre-training corpus. Threshold calibration (A4, +0.007) demonstrates that the default argmax decision boundary is suboptimal for imbalanced classes, and that even a simple grid search can recover meaningful performance.
+The largest single-component gain comes from the ensemble (A5, +0.013), indicating that hmBERT and XLM-R have genuinely complementary strengths: hmBERT excels on historical vocabulary and OCR-noisy text, while XLM-R brings stronger cross-lingual representations learned from its massive pre-training corpus. Threshold calibration (A4, +0.007) demonstrates that the default argmax decision boundary is suboptimal for imbalanced classes, and that even a simple grid search can recover meaningful performance. Note that claims that ``each component contributes measurably'' in the abstract refer to the overall system pipeline including stability; A2 and A3 contribute to stability (essential for reliable gains) rather than to mean MR directly.
 
 \subsection{Methodological Ablations}
 \label{sec:loss_ablation}
@@ -515,7 +515,7 @@ German & 0.60 & 0.30 & 0.4979 & 0.6366 \\
 \end{tabular}
 \end{table}
 
-The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). As established in Section~\ref{sec:results}, German's single-model \texttt{isAt} performance on hmBERT was exceptionally weak (MR=0.599, well below the 0.672 ensemble average); RLAE automatically mitigates this by routing 70\% of the German \texttt{isAt} decision weight to XLM-R. We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
+The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). As established in Section~\ref{sec:lang}, German's single-model \texttt{isAt} performance was the weakest across languages (MR=0.599, well below the 0.672 ensemble average); RLAE automatically mitigates this by routing 70\% of the German \texttt{isAt} decision weight to XLM-R. We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
 
 This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
