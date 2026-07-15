@@ -1,5 +1,5 @@
-% MHIPEX: Multilingual Historical Person-Place Relation Extraction
-% CLEF 2026 Working Notes â€” LNCS Format
+﻿% MHIPEX: Multilingual Historical Person-Place Relation Extraction
+% CLEF 2026 Working Notes Ã¢â‚¬â€ LNCS Format
 \documentclass[runningheads]{llncs}
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
@@ -266,7 +266,7 @@ The full procedure is formalized in Algorithm~\ref{alg:rlae}.
 \begin{figure}[t]
 \begin{small}
 \begin{tabbing}
-\textbf{Algorithm 1: RLAE — Post-hoc Relation-Specific Language-Adaptive Ensemble} \\[4pt]
+\textbf{Algorithm 1: RLAE â€” Post-hoc Relation-Specific Language-Adaptive Ensemble} \\[4pt]
 \textbf{Input:} \= Saved probability tensors $\mathbf{P}_\text{hmBERT}$, $\mathbf{P}_\text{XLM-R}$ on dev set; \\
                 \> Dev set labels $\mathbf{Y}$ with language tag $\ell$ per example \\
 \textbf{Output:} Optimal weight matrix $B \in \mathbb{R}^{|\mathcal{R}| \times |\mathcal{L}|}$, threshold matrix $T \in \mathbb{R}^{|\mathcal{R}| \times 3}$ \\[6pt]
@@ -633,21 +633,29 @@ This pattern confirms that static biographical and spatial facts act as distract
 \label{sec:limitations}
 %================================================================
 
-We identify several limitations of the current work, each pointing to concrete directions for future research.
+We identify several limitations of the current work, each pointing to a concrete direction for future research. We organize these by the category of gap they represent.
+
+\subsection*{Current System Limitations}
 
 \textbf{L1: Evaluation on development data.} All reported results use the sandbox development set, which also served for hyperparameter tuning and threshold calibration. This dual role introduces a risk of overfitting. The cross-dataset results (Section~\ref{sec:crossval}) partially mitigate this concern, but evaluation on the official held-out test set remains essential.
 
 \textbf{L2: Limited language coverage.} MHIPEX was evaluated on English, French, and German only. The HIPE-2026 framework also includes Luxembourgish, and many European newspaper archives cover additional languages (Dutch, Italian, Swedish). Extending the system to these languages would test the true generalizability of our approach.
 
-\textbf{L3: No external knowledge integration.} Our initial Knowledge Graph experiment (Section~\ref{sec:kg}) indicates that external facts improve spatial reasoning but harm temporal reasoning. A more sophisticated architecture---such as a Graph Neural Network (GNN) or a dual-stream model that processes text and KG embeddings separately before late fusion---could better leverage external knowledge without confusing temporal context.
+\textbf{L3: Weak performance on the \textsc{probable} class.} The three-way \texttt{at} classification achieves only 25.9\% recall on \textsc{probable}. This class is inherently ambiguous and annotators themselves may disagree on the \textsc{probable}/\textsc{true} boundary. Ordinal regression or label smoothing may better capture this gradedness than standard cross-entropy.
 
-\textbf{L4: Weak performance on the \textsc{probable} class.} The three-way \texttt{at} classification achieves only 25.9\% recall on \textsc{probable}, dragging down overall macro-recall. This class is inherently ambiguous---annotators themselves may disagree on the boundary between \textsc{probable} and \textsc{true}. Ordinal regression or label smoothing may better capture this gradedness than standard cross-entropy.
+\textbf{L4: Overfitting risk in RLAE.} The RLAE parameters (6 mixing weights + 9 thresholds) are optimized on the same development set used for evaluation. While cross-dataset results (Section~\ref{sec:crossval}) partially mitigate this concern, nested cross-validation or a held-out calibration split would provide stronger guarantees. With only 151 English development examples, the English-specific parameters are estimated from limited data.
 
-\textbf{L5: Only transformer-based encoders explored.} We evaluated three BERT-family models but did not test decoder-based architectures (e.g., instruction-tuned LLMs) or generative approaches. Recent work on in-context learning with large language models suggests that few-shot prompting could be competitive, particularly for the knowledge-intensive \texttt{at} relation.
+\subsection*{Planned Experimental Extensions}
 
-\textbf{L6: OCR noise not explicitly addressed.} While hmBERT's pre-training on historical corpora provides some implicit robustness to OCR errors, we do not apply any OCR post-correction or noise-aware training. Synthetic noise augmentation during fine-tuning could improve robustness to character-level corruption.
+\textbf{E1: OCR-Noise-Aware Training.} Our error analysis attributes 28\% of failures to OCR corruption (e.g., ``Philadclphia'' for ``Philadelphia''). The current pipeline relies entirely on hmBERT's historical pre-training to absorb OCR noise implicitly. A planned experiment will synthetically inject realistic character-level OCR confusions during training (common substitutions: $\mathit{rn}\!\to\!m$, $l\!\to\!1$, $c\!\to\!e$, long-$s\!\to\!f$) and compare four configurations: (R0) standard training on clean text; (R1) standard training evaluated on corrupted text; (R2) noise-augmented training evaluated on clean text; and (R3) noise-augmented training evaluated on corrupted text. This 2$\times$2 design directly measures both the brittleness of the current model (R0 vs.\ R1 drop) and the gain from explicit robustification (R1 vs.\ R3 recovery), using the OCR-flagged subset of the 50-example error analysis as a targeted diagnostic set.
 
-\textbf{L7: Overfitting risk in RLAE.} The RLAE parameters (6~mixing weights + 9~thresholds) are optimized on the same development set used for evaluation, introducing a risk of overfitting. While the cross-dataset results (Section~\ref{sec:crossval}) partially mitigate this concern, nested cross-validation or a held-out calibration split would provide stronger guarantees. Additionally, with only 151 English development examples, the English-specific parameters are estimated from limited data.
+\textbf{E2: Knowledge-Graph-Augmented Architecture (GNN).} Our initial KG experiment (Section~\ref{sec:kg}) injects KG facts as plain text strings. A more expressive design would construct a document-level entity graph: nodes represent person and place entities, edges encode co-occurrence frequency, sentence proximity, and dependency-arc links; a Graph Attention Network (GAT)~\cite{velickovic2018} then produces entity-pair embeddings that are concatenated with the RLAE output before the classification head. This architecture treats entity pairs jointly rather than independently, capturing global document context that the current single-pair encoder misses. The planned ablation compares: transformer-only (current) vs.\ transformer + GAT (KG-edges only) vs.\ transformer + GAT (text-graph edges), using the same macro-recall metric and development set.
+
+\textbf{E3: Retrieval-Augmented Relation Extraction (RAG).} When the model encounters a person entity, a retrieval module queries Wikidata via SPARQL to fetch biographical facts (P19 birthplace, P20 deathplace, P551 residence, P39 position held) and appends them as structured-fact strings before the encoder. Unlike our current static KG augmentation (Section~\ref{sec:kg}), the RAG approach is dynamic: facts are retrieved on-demand at inference time, allowing the system to handle new entities and time periods not covered during training. The planned experiment evaluates this over the \texttt{at} relation only, since retrieval of static facts is known to harm temporal reasoning (Section~\ref{sec:kg}), and measures whether dynamic retrieval can address the 26\% of errors caused by missing implicit world knowledge.
+
+\textbf{E4: Joint NER + Entity Linking + Relation Extraction.} The current pipeline assumes pre-given entity pairs (provided by the HIPE-2026 task). A more general model would jointly learn named entity recognition, entity linking to Wikidata/GeoNames, and relation classification in a single multi-task network, where the linked entity embedding directly informs the relation head. Recent joint models~\cite{yamada2020} demonstrate that entity-aware pre-training substantially improves RE by resolving entity ambiguity (e.g., ``George Washington'' person vs.\ place) at the linking stage rather than leaving it to the relation classifier.
+
+\textbf{E5: HIPE-2027 Participation.} We plan to participate in the HIPE-2027 shared task, submitting MHIPEX-RLAE as our official system. Participation will yield evaluation on the official held-out test set (addressing L1), access to additional annotated data from new archive collections (addressing L2), and direct competitive comparison against future systems, providing the external validation that the current sandbox-only evaluation cannot supply.
 
 %================================================================
 \section{Conclusion}
@@ -740,7 +748,7 @@ Simon, R., Barker, E., Isaksen, L., de Soto Ca\~namares, P.:
 Linked Data Annotation Without the Pointy Brackets: Introducing Recogito 2.
 Journal of Map \& Geography Libraries 13(1), 111--132 (2017)
 
-% ── Broader RE Methods ──────────────────────────────────────────
+% â”€â”€ Broader RE Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{yamada2020}
 Yamada, I., Asai, A., Shindo, H., Takeda, H., Matsumoto, Y.:
@@ -762,7 +770,7 @@ Zhou, W., Huang, K., Ma, T., Huang, J.:
 Document-Level Relation Extraction with Adaptive Thresholding and Localized Context Pooling.
 In: Proceedings of AAAI 2021, pp.~14612--14620. AAAI (2021)
 
-% ── Ensemble Methods ────────────────────────────────────────────
+% â”€â”€ Ensemble Methods â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{wolpert1992}
 Wolpert, D.H.:
@@ -773,8 +781,13 @@ Neural Networks 5(2), 241--259 (1992)
 Garmash, E., Monz, C.:
 Ensemble Learning for Multi-Source Neural Machine Translation.
 In: Proceedings of COLING 2016, pp.~1409--1418. ACL (2016)
+\\bibitem{velickovic2018}
+Veli\v{c}kovi\'{c}, P., Cucurull, G., Casanova, A., Romero, A., Li{o}, P., Bengio, Y.:
+Graph Attention Networks.
+In: Proceedings of ICLR 2018. OpenReview (2018)
 
-% ── Knowledge Graphs and Entity Linking ─────────────────────────
+
+% â”€â”€ Knowledge Graphs and Entity Linking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{zhang2019}
 Zhang, Z., Han, X., Liu, Z., Jiang, X., Sun, M., Liu, Q.:
@@ -791,7 +804,7 @@ Vrande\v{c}i\'c, D., Kr\"otzsch, M.:
 Wikidata: A Free Collaborative Knowledgebase.
 Communications of the ACM 57(10), 78--85 (2014)
 
-% ── Historical NLP and OCR ──────────────────────────────────────
+% â”€â”€ Historical NLP and OCR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{hill2019}
 Hill, M.J., Hengchen, S.:
@@ -808,7 +821,7 @@ Boros, E., Hamdi, A., Pontes, E.L., Cabrera-Diego, L.A., Moreno, J.G., Sidere, N
 Alleviating Digitization Errors in Named Entity Recognition for Historical Documents.
 In: Proceedings of CoNLL 2020, pp.~431--441. ACL (2020)
 
-% ── Cross-lingual Transfer ──────────────────────────────────────
+% â”€â”€ Cross-lingual Transfer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{pires2019}
 Pires, T., Schlinger, E., Garrette, D.:
@@ -820,7 +833,7 @@ Wu, S., Dredze, M.:
 Are All Languages Created Equal in Multilingual BERT?
 In: Proceedings of the 5th Workshop on Representation Learning for NLP, pp.~120--130. ACL (2020)
 
-% ── Temporal Reasoning ──────────────────────────────────────────
+% â”€â”€ Temporal Reasoning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{ning2018}
 Ning, Q., Wu, H., Roth, D.:
@@ -832,7 +845,7 @@ Mathur, P., Jain, R., Dernoncourt, F., Mober, D., Ekbal, A., Bansal, S.:
 TIMERS: Document-level Temporal Relation Extraction.
 In: Proceedings of ACL-IJCNLP 2021, pp.~524--533. ACL (2021)
 
-% ── Gazetteers and Historical Geography ─────────────────────────
+% â”€â”€ Gazetteers and Historical Geography â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{ahlers2013}
 Ahlers, D.:
@@ -845,11 +858,11 @@ The CIDOC Conceptual Reference Model: An Ontological Approach to Semantic Intero
 AI Magazine 24(3), 75--92 (2003)
 
 \bibitem{grossner2021}
-Grossner, K., Janowicz, K., Keßler, C.:
+Grossner, K., Janowicz, K., KeÃŸler, C.:
 Place, Period, and Setting for Linked Data Gazetteers.
 In: Geospatial Semantics and the Semantic Web, pp.~80--96. Springer (2021)
 
-% ── Calibration and Thresholding ────────────────────────────────
+% â”€â”€ Calibration and Thresholding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 \bibitem{guo2017}
 Guo, C., Pleiss, G., Sun, Y., Weinberger, K.Q.:
@@ -864,3 +877,4 @@ In: Proceedings of ECML-PKDD 2014, pp.~225--239. Springer (2014)
 \end{thebibliography}
 
 \end{document}
+
