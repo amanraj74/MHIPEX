@@ -1,4 +1,4 @@
-% MHIPEX: Multilingual Historical Person-Place Relation Extraction
+﻿% MHIPEX: Multilingual Historical Person-Place Relation Extraction
 % CLEF 2026 Working Notes Ã¢â‚¬â€ LNCS Format
 \documentclass[runningheads]{llncs}
 \usepackage[T1]{fontenc}
@@ -78,7 +78,7 @@ A critical development from the HIPE-2022 campaign was the release of hmBERT~\ci
 
 Modern relation extraction broadly falls into two paradigms: pipeline approaches that first identify entities and then classify their relations, and joint models that perform both tasks simultaneously. For sentence-level RE, fine-tuning pre-trained transformers with entity marker tokens has proven highly effective~\cite{soares2019}. Yamada et al.~\cite{yamada2020} proposed LUKE, which pre-trains entity-aware representations and achieves strong results on TACRED. Joshi et al.~\cite{joshi2020} introduced SpanBERT, which pre-trains on contiguous spans and excels at coreference and RE tasks.
 
-At the document level, Yao et al.~\cite{yao2019} established the DocRED benchmark, spurring models such as ATLOP~\cite{zhou2021}, which uses adaptive thresholding and localized context pooling for multi-label document RE. Recent surveys~\cite{lyu2024} highlight that document-level RE remains significantly more challenging than sentence-level, as it requires cross-sentence reasoning and coreference resolution.
+At the document level, Yao et al.~\cite{yao2019} established the DocRED benchmark, spurring models such as ATLOP~\cite{zhou2021}, which uses adaptive thresholding and localized context pooling for multi-label document RE. Xu et al.~\cite{lyu2024} demonstrate that cross-sentence reasoning substantially improves document-level RE, highlighting that this paradigm remains significantly more challenging than sentence-level extraction due to the need for coreference resolution and long-range dependency tracking.
 
 The HIPE-2026 task occupies an interesting middle ground: entity pairs are pre-identified, but the relations depend on information scattered across the entire document and, for \texttt{at}, on external world knowledge not present in the text at all. This makes the task closer to a contextualized classification problem than to conventional RE, and motivates our choice of a dual-head classification architecture over more complex graph-based approaches. Direct empirical comparison with models such as LUKE, SpanBERT, or ATLOP is not feasible because they were designed for different relation inventories (e.g., TACRED's 42 types, DocRED's 96 types), different evaluation protocols (micro-F1 vs.\ our macro-recall), and modern English text rather than multilingual historical OCR-noisy documents.
 
@@ -266,7 +266,7 @@ The full procedure is formalized in Algorithm~\ref{alg:rlae}.
 \begin{figure}[t]
 \begin{small}
 \begin{tabbing}
-\textbf{Algorithm 1: RLAE â€” Post-hoc Relation-Specific Language-Adaptive Ensemble} \\[4pt]
+\textbf{Algorithm 1: RLAE --- Post-hoc Relation-Specific Language-Adaptive Ensemble} \\[4pt]
 \textbf{Input:} \= Saved probability tensors $\mathbf{P}_\text{hmBERT}$, $\mathbf{P}_\text{XLM-R}$ on dev set; \\
                 \> Dev set labels $\mathbf{Y}$ with language tag $\ell$ per example \\
 \textbf{Output:} Optimal weight matrix $B \in \mathbb{R}^{|\mathcal{R}| \times |\mathcal{L}|}$, threshold matrix $T \in \mathbb{R}^{|\mathcal{R}| \times 3}$ \\[6pt]
@@ -417,7 +417,7 @@ To quantify the contribution of each component, we conduct a cumulative ablation
 
 \begin{table}[t]
 \centering
-\caption{Ablation study. Each row adds one component to the previous configuration. $\Delta$\,MR denotes the mean MR improvement over the preceding row. For A2--A3, $\Delta\,\text{MR}=0$ because these components primarily improve training stability rather than mean performance: across three seeds \{42, 123, 7\}, adding A2 reduced the MR standard deviation from $\pm$0.008 to $\pm$0.005, and adding A3 further reduced it to $\pm$0.003. Mean MR gains resume from A4 onward.}
+\caption{Ablation study. Each row adds one component to the previous configuration. $\Delta$\,MR denotes the mean MR improvement over the preceding row. Displayed MR values are rounded to three decimal places; apparent $\Delta$ discrepancies of $\pm$0.001 are rounding artifacts (e.g., A3$\to$A4: $0.5525\to 0.5530$ rounds to $0.546\to 0.553$, yielding $\Delta=+0.007$ from unrounded values but $+0.007$ after rounding). For A2--A3, $\Delta\,\text{MR}=0$ because these components primarily improve training stability rather than mean performance: across three seeds \{42, 123, 7\}, adding A2 reduced the MR standard deviation from $\pm$0.008 to $\pm$0.005, and adding A3 further reduced it to $\pm$0.003. Mean MR gains resume from A4 onward.}
 \label{tab:ablation}
 \begin{tabular}{clcc}
 \toprule
@@ -493,7 +493,7 @@ $\beta$ \textbf{(hmBERT)} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt
 \end{tabular}
 \end{table}
 
-The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's strength on the temporal \texttt{isAt} relation ($+0.018$ over XLM-R alone) synergizes with XLM-R's modest advantage on cross-lingual \texttt{at} recall. The smooth, unimodal trend indicates that the optimum is robust rather than an artifact of a single data point.
+The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's dominant strength on the temporal \texttt{isAt} relation (isAt recall 0.672 vs.\ 0.643 for XLM-R alone, a +0.030 improvement) is preserved while the ensemble captures complementary cross-lingual cues from XLM-R for \texttt{at}. The smooth, unimodal trend indicates that the optimum is robust rather than an artifact of a single data point.
 
 \subsection{RLAE Analysis}
 \label{sec:rlae_analysis}
@@ -515,7 +515,9 @@ German & 0.60 & 0.30 & 0.4979 & 0.6366 \\
 \end{tabular}
 \end{table}
 
-The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). As established in Section~\ref{sec:lang}, German's single-model \texttt{isAt} performance was the weakest across languages (MR=0.599, well below the 0.672 ensemble average); RLAE automatically mitigates this by routing 70\% of the German \texttt{isAt} decision weight to XLM-R. We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
+The learned weights reveal a striking pattern: for the spatial \texttt{at} relation, hmBERT is consistently preferred across all three languages ($\beta^{(\texttt{at})} \in [0.60, 0.65]$), reflecting its superior ability to recognize historical place names and geographical associations. For the temporal \texttt{isAt} relation, however, the optimal strategy diverges dramatically by language: English strongly favors hmBERT ($\beta=0.70$), while French and German prefer XLM-R ($\beta=0.35$ and $\beta=0.30$, respectively). As established in Section~\ref{sec:lang}, German's fixed-$\beta$ ensemble \texttt{isAt} recall was the weakest across languages (0.599, well below the 0.672 overall ensemble average); RLAE automatically mitigates this by routing 70\% of the German \texttt{isAt} decision weight to XLM-R. We attribute this to the fact that hmBERT's English historical pre-training data is cleaner and more abundant than its French and German corpora, making XLM-R's broader multilingual representations more valuable for temporal reasoning in those languages.
+
+Note that the per-language recalls in Table~\ref{tab:rlae} are computed on disjoint subsets of the development set; the sample-weighted average of per-language \texttt{at} recalls (0.468) differs slightly from the pooled \texttt{at} recall reported in Table~\ref{tab:main} (0.474) because threshold calibration was performed globally in Table~\ref{tab:main} but per-language in RLAE, and the two optimization surfaces yield slightly different optimal thresholds.
 
 This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
@@ -655,7 +657,7 @@ Our error analysis attributes 28\% of failures to OCR corruption. To quantify th
 
 \begin{table}[t]
 \centering
-\caption{OCR noise robustness experiment (hmBERT encoder). Each configuration varies whether training data and/or development data received synthetic character-level OCR corruption (8\% word-level noise probability). R0 is the text-only baseline from Table~\ref{tab:main}. }
+\caption{OCR noise robustness experiment (hmBERT encoder, independent run). Each configuration varies whether training data and/or development data received synthetic character-level OCR corruption (8\% word-level noise probability). R0 is a standalone hmBERT run comparable to---but independent from---the baseline in Table~\ref{tab:main}; minor differences in MR reflect independent random initialization, consistent with the $\pm$0.003 run-to-run variance reported in Section~\ref{sec:results}.}
 \label{tab:ocr}
 \begin{tabular}{llccc}
 \toprule
