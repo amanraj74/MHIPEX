@@ -1,0 +1,5 @@
+name,train_noise,eval_noise,MR,at,isAt,time_min
+R0_clean_clean,0%,0%,0.5544,0.4675,0.6413,21.1
+R1_clean_corrupted,0%,8%,0.5398,0.4447,0.6348,22.8
+R2_noisy_clean,8%,0%,0.5521,0.4691,0.635,19.3
+R3_noisy_corrupted,8%,8%,0.5461,0.4642,0.628,26.2
