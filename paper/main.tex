@@ -177,7 +177,7 @@ Figure~\ref{fig:arch} illustrates the MHIPEX pipeline, which consists of four st
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/architecture1.png}
-\caption{Overview of the MHIPEX pipeline. The input is enriched with date and language tokens, processed by two complementary encoders (hmBERT and XLM-R) with dual pooling and multi-sample dropout, and fused via weighted soft voting with threshold calibration.}
+\caption{Overview of the MHIPEX pipeline. The input is enriched with date and language tokens, processed by two complementary encoders (hmBERT and XLM-R) with dual pooling and multi-sample dropout, and fused via weighted soft voting with threshold calibration. The RLAE extension (Section~\ref{sec:rlae}) replaces the global $\beta$ with per-language, per-relation weights; the overall pipeline structure remains identical.}
 \label{fig:arch}
 \end{figure}
 
@@ -220,7 +220,7 @@ We apply \textbf{multi-sample dropout}~\cite{inoue2019} with $K=3$ independent m
     \mathcal{L} = \frac{1}{K}\sum_{k=1}^{K}\left[\mathcal{L}_{\texttt{at}}^{(k)} + \mathcal{L}_{\texttt{isAt}}^{(k)}\right]
 \end{equation}
 
-Each $\mathcal{L}^{(k)}$ uses class-weighted cross-entropy with weights inversely proportional to class frequency. For the \texttt{at} head, the weights are $[0.80, 1.50, 2.40]$ for [\textsc{false}, \textsc{probable}, \textsc{true}]; for \texttt{isAt}, $[0.70, 2.60]$.
+Each $\mathcal{L}^{(k)}$ uses class-weighted cross-entropy. The raw weights are computed as $w_c = N / (C \cdot n_c)$, where $N$ is the total number of training samples, $C$ is the number of classes, and $n_c$ is the count for class $c$. These are then clipped to $[0.5, 3.0]$ for training stability, yielding final weights of $[0.80, 1.50, 2.40]$ for the \texttt{at} head ([\textsc{false}, \textsc{probable}, \textsc{true}]) and $[0.70, 2.60]$ for \texttt{isAt}.
 
 \subsection{Training Strategy}
 
@@ -235,7 +235,7 @@ Training uses AdamW optimization with cosine learning rate scheduling and linear
 \subsection{Post-hoc Threshold Calibration}
 \label{sec:calibration}
 
-Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. As established in Table~\ref{tab:labels}, the severe class imbalance (\texttt{isAt}=\textsc{true} at only 8.4\%) causes default argmax decoding to systematically favor majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$.
+Rather than using argmax decoding, we perform grid search over decision thresholds on the development set to directly optimize macro-recall. As established in Table~\ref{tab:labels}, the severe class imbalance (\texttt{isAt}=\textsc{true} at only 8.4\%) causes default argmax decoding to systematically favor majority classes; calibration recovers recall on minority labels at a controlled cost to majority-class precision. For the three-way \texttt{at} classification, we search over probability thresholds for \textsc{probable} ($\tau_p \in [0.20, 0.55]$, step 0.05) and \textsc{true} ($\tau_t \in [0.20, 0.55]$, step 0.05). For binary \texttt{isAt}, we search over a single threshold $\tau_i \in [0.15, 0.60]$, step 0.05. The final selected thresholds for the hmBERT encoder are $\tau_p=0.30$, $\tau_t=0.25$, and $\tau_i=0.30$. To illustrate the practical impact: without calibration, the hmBERT encoder assigns a posterior probability of 0.28 for \texttt{isAt}=\textsc{true} on a German article describing a politician visiting Berlin. Under default argmax decoding this is classified as \textsc{false}; with the calibrated threshold $\tau_i=0.30$ the prediction correctly flips to \textsc{true}, recovering a minority-class true positive that would otherwise be lost.
 
 \subsection{Ensemble}
 \label{sec:ensemble}
@@ -453,7 +453,7 @@ Beyond architectural components, we explicitly validate two core methodological 
 
 \begin{table}[t]
 \centering
-\caption{Comparison of loss functions on the hmBERT encoder. Weighted Cross-Entropy yields the strongest overall macro-recall. All differences are within the $\pm$0.003 run-to-run variance of the system, so results are interpreted directionally rather than as statistically significant conclusions.}
+\caption{Comparison of loss functions on the hmBERT encoder (independent runs, 20 epochs each). Weighted Cross-Entropy yields the strongest overall macro-recall. All differences are within the $\pm$0.003 run-to-run variance of the system, so results are interpreted directionally rather than as statistically significant conclusions. Note: MR values here are from standalone experiments and may differ from the cumulative ablation in Table~\ref{tab:ablation} due to independent random initialization.}
 \label{tab:loss_ablation}
 \begin{tabular}{lccc}
 \toprule
@@ -475,7 +475,7 @@ To justify the ensemble mixing coefficient $\beta=0.60$ and evaluate the robustn
 
 \begin{table}[t]
 \centering
-\caption{Ensemble weight sensitivity analysis. $\beta$ controls the hmBERT contribution. Performance peaks at $\beta=0.60$.}
+\caption{Ensemble weight sensitivity analysis. $\beta$ controls the hmBERT contribution. Performance peaks at $\beta=0.60$. The $\beta=1.0$ row represents a separate calibrated hmBERT run and may differ from Table~\ref{tab:main} by up to $\pm$0.001 due to threshold re-optimization.}
 \label{tab:beta}
 \begin{tabular}{cccc}
 \toprule
@@ -624,9 +624,11 @@ E3: Text + Getty TGN & 43\% & 0.550 & 0.453 & 0.647 \\
 \end{tabular}
 \end{table}
 
-The results (Table~\ref{tab:kg}) reveal a striking dichotomy between spatial and temporal reasoning. The spatial \texttt{at} relation benefits immensely from static KG facts: GeoNames (E2) achieves the highest spatial recall (+1.2 percentage points over the baseline), as its dense geographical hierarchy helps the model associate locations correctly. Wikidata (E1) also provides a solid spatial boost. However, for the strict temporal event relation (\texttt{isAt}), every single KG augmentation degrades performance. GeoNames causes the most severe drop ($-$2.0\,pp in \texttt{isAt} recall). 
+The results (Table~\ref{tab:kg}) reveal a striking dichotomy between spatial and temporal reasoning. The spatial \texttt{at} relation benefits from static KG facts when coverage is sufficient: GeoNames (E2, 61\% coverage) achieves the highest spatial recall (+1.2\,pp over the baseline), as its dense geographical hierarchy helps the model associate locations correctly. Wikidata (E1, 74\% coverage) also provides a solid spatial boost (+0.9\,pp). However, for the strict temporal event relation (\texttt{isAt}), every single KG augmentation degrades performance. GeoNames causes the most severe drop ($-$2.0\,pp in \texttt{isAt} recall).
 
-This pattern confirms that static biographical and spatial facts act as distractors for temporal events. The model incorrectly infers an \texttt{isAt} relation simply because a birthplace or regional hierarchy matches the article's location, ignoring the temporal constraint of the publication date. This finding suggests that effective KG augmentation for temporal relations will require timeline-aware historical fact selection rather than static property retrieval, and it directly motivates our decoupled RLAE design that routes spatial and temporal decisions independently.
+Notably, Getty TGN (E3) degrades even \texttt{at} recall ($-$1.4\,pp) despite being a specialized historical gazetteer. We attribute this to its low coverage (43\%): only a minority of entity pairs receive any KG augmentation, and the introduced tokens may act as noise rather than signal when entity matches are sparse. This suggests a minimum coverage threshold---tentatively around 60\%---below which text-based KG augmentation becomes counterproductive.
+
+The overall pattern confirms that static biographical and spatial facts act as distractors for temporal events. The model incorrectly infers an \texttt{isAt} relation simply because a birthplace or regional hierarchy matches the article's location, ignoring the temporal constraint of the publication date. This finding suggests that effective KG augmentation for temporal relations will require timeline-aware historical fact selection rather than static property retrieval, and it directly motivates our decoupled RLAE design that routes spatial and temporal decisions independently.
 
 %================================================================
 \section{Limitations and Future Work}
@@ -677,7 +679,9 @@ The results reveal two key findings. First, OCR corruption degrades performance 
 
 \textbf{E4: Joint NER + Entity Linking + Relation Extraction.} The current pipeline assumes pre-given entity pairs (provided by the HIPE-2026 task). A more general model would jointly learn named entity recognition, entity linking to Wikidata/GeoNames, and relation classification in a single multi-task network, where the linked entity embedding directly informs the relation head. Recent joint models~\cite{yamada2020} demonstrate that entity-aware pre-training substantially improves RE by resolving entity ambiguity (e.g., ``George Washington'' person vs.\ place) at the linking stage rather than leaving it to the relation classifier.
 
-\textbf{E5: HIPE-2027 Participation.} We plan to participate in the HIPE-2027 shared task, submitting MHIPEX-RLAE as our official system. Participation will yield evaluation on the official held-out test set (addressing L1), access to additional annotated data from new archive collections (addressing L2), and direct competitive comparison against future systems, providing the external validation that the current sandbox-only evaluation cannot supply.
+\textbf{E5: Ontology-Constrained Relation Prediction.} Instead of predicting relations independently, entity-type constraints from formal ontologies such as CIDOC-CRM~\cite{doerr2003} could eliminate impossible predictions at inference time. For example, an ontology encoding that a \textsc{Person} can be \texttt{isAt} a \textsc{City} but not a \textsc{River} or \textsc{Ocean} would allow the system to reject implausible classifications (e.g., ``Einstein \texttt{isAt} Atlantic Ocean'') without retraining. This post-hoc validation layer is complementary to RLAE and could be implemented using the Europeana Data Model or Linked Open Data type hierarchies.
+
+\textbf{E6: HIPE-2027 Participation.} We plan to participate in the HIPE-2027 shared task, submitting MHIPEX-RLAE as our official system. Participation will yield evaluation on the official held-out test set (addressing L1), access to additional annotated data from new archive collections (addressing L2), and direct competitive comparison against future systems, providing the external validation that the current sandbox-only evaluation cannot supply.
 
 %================================================================
 \section{Conclusion}
@@ -803,8 +807,9 @@ Neural Networks 5(2), 241--259 (1992)
 Garmash, E., Monz, C.:
 Ensemble Learning for Multi-Source Neural Machine Translation.
 In: Proceedings of COLING 2016, pp.~1409--1418. ACL (2016)
-\\bibitem{velickovic2018}
-Veli\v{c}kovi\'{c}, P., Cucurull, G., Casanova, A., Romero, A., Li{o}, P., Bengio, Y.:
+
+\bibitem{velickovic2018}
+Veli\v{c}kovi\'{c}, P., Cucurull, G., Casanova, A., Romero, A., Li\`{o}, P., Bengio, Y.:
 Graph Attention Networks.
 In: Proceedings of ICLR 2018. OpenReview (2018)
 
@@ -880,7 +885,7 @@ The CIDOC Conceptual Reference Model: An Ontological Approach to Semantic Intero
 AI Magazine 24(3), 75--92 (2003)
 
 \bibitem{grossner2021}
-Grossner, K., Janowicz, K., KeÃŸler, C.:
+Grossner, K., Janowicz, K., Ke{\ss}ler, C.:
 Place, Period, and Setting for Linked Data Gazetteers.
 In: Geospatial Semantics and the Semantic Web, pp.~80--96. Springer (2021)
 
