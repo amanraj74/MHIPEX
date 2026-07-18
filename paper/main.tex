@@ -93,7 +93,7 @@ A persistent question in multilingual NLP is whether domain-specific models outp
 
 \subsection{Knowledge Graphs and Digital Humanities Gazetteers}
 
-Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies) and the Getty Thesaurus of Geographic Names~(TGN; multilingual place name coverage) are highly relevant. Furthermore, the World Historical Gazetteer (WHG) offers purpose-built temporal scoping for historical place names that shift across centuries, while the Virtual International Authority File (VIAF) provides person-authority records critical for resolving entity ambiguity (e.g., distinguishing ``George Washington'' the person from the place)---a failure mode that accounts for 24\% of all errors in our system (Section~\ref{sec:error}).
+Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies) and the Getty Thesaurus of Geographic Names~(TGN; multilingual place name coverage) are highly relevant. Furthermore, the World Historical Gazetteer (WHG) offers purpose-built temporal scoping for historical place names that shift across centuries, while the Virtual International Authority File (VIAF) provides person-authority records critical for resolving entity ambiguity (e.g., distinguishing ``George Washington'' the person from the place)---a failure mode that accounts for 24\% of all errors in our system (Section~\ref{sec:errors}).
 
 In the digital humanities community, the Pelagios/Recogito initiative~\cite{simon2017} has developed linked-open-data infrastructure specifically for historical place annotation in digitized texts, directly aligned with the challenges of the HIPE-2026 task. Similarly, the CIDOC Conceptual Reference Model (CIDOC-CRM) provides a formal ontology for cultural heritage that could constrain relation predictions based on entity type compatibility (e.g., ruling out implausible person--location associations). Despite their relevance, none of these resources have been systematically integrated into transformer-based relation extraction for historical newspapers. Our Knowledge Graph experiment (Section~\ref{sec:kg}) takes a first step in this direction by integrating Wikidata, GeoNames, and TGN.
 
@@ -264,7 +264,7 @@ While the individual components of MHIPEX---historically pre-trained transformer
 
 From a theoretical perspective, RLAE can be understood as a conditional Mixture-of-Experts~\cite{garmash2016} where the gating function is conditioned on observable metadata (language tag and relation type) rather than on learned input features. By partitioning the prediction space into more homogeneous subsets, per-group optimization reduces within-group ensemble variance without the overfitting risk of fully learned gating on small data. Importantly, RLAE operates entirely as a post-hoc procedure on saved probability tensors and requires no model retraining.
 
-The full procedure is formalized in Algorithm~\ref{alg:rlae}.
+The full procedure is formalized in Algorithm 1.
 
 \begin{figure}[t]
 \begin{small}
@@ -289,7 +289,6 @@ The full procedure is formalized in Algorithm~\ref{alg:rlae}.
 \hspace{2.8em} no gradient computation; total runtime $< 5$ seconds on CPU.
 \end{tabbing}
 \end{small}
-\label{alg:rlae}
 \end{figure}
 
 
@@ -478,13 +477,13 @@ Table~\ref{tab:rlae} reports the per-language mixing weights learned by RLAE (Eq
 \centering
 \caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$; $\tau^{(r)}_\ell$ denotes the corresponding optimized classification threshold. Displayed recall values are rounded to four decimal places; MR is computed from unrounded per-relation recalls. English weights are estimated on a very small sample (151 development pairs) and should be interpreted with appropriate caution until validated on additional datasets.}
 \label{tab:rlae}
-\begin{tabular}{lcccccc}
+\begin{tabular}{lccccccc}
 \toprule
-\textbf{Language} & $\beta^{(\texttt{at})}_\ell$ & $\tau^{(\texttt{at})}_\ell$ & $\beta^{(\texttt{isAt})}_\ell$ & $\tau^{(\texttt{isAt})}_\ell$ & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
+\textbf{Language} & $\beta^{(\texttt{at})}_\ell$ & $\tau_{p}^{(\texttt{at})}$ & $\tau_{t}^{(\texttt{at})}$ & $\beta^{(\texttt{isAt})}_\ell$ & $\tau^{(\texttt{isAt})}_\ell$ & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
 \midrule
-English & 0.65 & 0.28 & 0.70 & 0.30 & 0.5325 & 0.7446 \\
-French & 0.60 & 0.30 & 0.35 & 0.25 & 0.4528 & 0.6833 \\
-German & 0.60 & 0.32 & 0.30 & 0.28 & 0.4979 & 0.6366 \\
+English & 0.65 & 0.45 & 0.55 & 0.70 & 0.30 & 0.5325 & 0.7446 \\
+French & 0.60 & 0.55 & 0.55 & 0.35 & 0.25 & 0.4528 & 0.6833 \\
+German & 0.60 & 0.55 & 0.30 & 0.30 & 0.15 & 0.4979 & 0.6366 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -661,7 +660,7 @@ We identify several limitations of the current work, each pointing to a concrete
 
 \subsubsection*{OCR-Noise Robustness (Completed)}
 
-Our error analysis attributes 28\% of failures to OCR corruption. To quantify this brittleness and test whether explicit noise augmentation provides robustness, we conducted a 2$\times$2 experiment varying whether the training data and the evaluation set were corrupted with synthetic OCR noise (word-level character substitutions: $\mathit{rn}\!\to\!m$, $l\!\to\!1$, $c\!\to\!e$, long-$s\!\to\!f$, at 8\% word probability). Note that this is a data-augmentation approach, not the contrastive/consistency training objective proposed in our research design; the contrastive variant, which would explicitly pull clean and OCR-corrupted representations together in embedding space, remains a planned extension (E2). Table~\ref{tab:ocr} reports the results.
+Our error analysis attributes 28\% of failures to OCR corruption. To quantify this brittleness and test whether explicit noise augmentation provides robustness, we conducted a 2$\times$2 experiment varying whether the training data and the evaluation set were corrupted with synthetic OCR noise (word-level character substitutions: $\mathit{rn}\!\to\!m$, $l\!\to\!1$, $c\!\to\!e$, long-$s\!\to\!f$, at 8\% word probability). Note that this is a data-augmentation approach, not the contrastive/consistency training objective proposed in our research design; the contrastive variant, which would explicitly pull clean and OCR-corrupted representations together in embedding space, remains a planned extension (E8). Table~\ref{tab:ocr} reports the results.
 
 \begin{table}[t]
 \centering
@@ -694,6 +693,8 @@ The results reveal two key findings. First, OCR corruption degrades performance 
 \textbf{E6: HIPE-2027 Participation.} We plan to participate in the HIPE-2027 shared task, submitting MHIPEX-RLAE as our official system. Participation will yield evaluation on the official held-out test set (addressing L1), access to additional annotated data from new archive collections (addressing L2), and direct competitive comparison against future systems, providing the external validation that the current sandbox-only evaluation cannot supply.
 
 \textbf{E7: Additional Knowledge Sources.} Our error analysis identifies entity ambiguity (24\% of errors) as a major failure mode. VIAF (Virtual International Authority File) provides person-authority records that directly disambiguate cases like ``George Washington'' (person vs.\ place), and should be evaluated for the \texttt{at} relation. Similarly, the World Historical Gazetteer, which is purpose-built for historical place names across periods and languages, is a natural complement to GeoNames for improving spatial recall. We plan to integrate these sources via the RAG pipeline described in E3.
+
+\textbf{E8: Contrastive OCR Training.} We plan to implement a consistency training objective that pulls clean and OCR-corrupted representations of the same document together in the embedding space. Unlike the synthetic data augmentation evaluated in Table~\ref{tab:ocr}, this explicitly regularizes the encoder to become invariant to character-level noise.
 
 %================================================================
 \section{Conclusion}
