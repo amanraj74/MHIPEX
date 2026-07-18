@@ -1,160 +1,142 @@
-# MHIPEX — Complete Project Status (v24)
+# MHIPEX — Complete Project Status (v25)
 
-> **Last updated:** 2026-07-17  
-> **Version:** v24 (camera-ready)  
-> **PDF:** `MHIPEX_Paper_Final_v24.pdf` (2122 KB)  
+> **Last updated:** 2026-07-18  
+> **Version:** v25 (camera-ready)  
+> **PDF:** `MHIPEX_Paper_Final_v25.pdf` (2123 KB)  
 > **GitHub:** https://github.com/amanraj74/MHIPEX
 
 ---
 
 ## 1. What This Project Is
 
-**MHIPEX** (Multilingual Historical Information Person-place EXtraction) is a framework for classifying person–place relations in multilingual historical newspaper articles. Developed for CLEF HIPE-2026 but framed as a standalone journal contribution.
+**MHIPEX** (Multilingual Historical Information Person-place EXtraction) classifies person–place relations in multilingual historical newspaper articles. Developed for CLEF HIPE-2026, framed as a journal contribution.
 
-**Core contribution:** RLAE (Relation-Specific Language-Adaptive Ensemble) — a conditional Mixture-of-Experts that learns independent mixing weights per relation type × language without end-to-end retraining.
+**Core contribution:** RLAE — a post-hoc, relation-specific, language-adaptive ensemble that learns independent mixing weights + thresholds per (relation × language) pair without retraining.
 
-**Best result:** MR = 0.5767 (95% CI: [0.548, 0.604]) on HIPE-2026 sandbox dev set.
-
----
-
-## 2. All Experiments (Kaggle Notebooks)
-
-Every experiment runs on Kaggle (T4×2 GPUs). Each notebook is **fully self-contained** — downloads data from GitHub, installs dependencies, saves CSV results.
-
-| Experiment | Notebook File | CSV Output | Status |
-|---|---|---|---|
-| Main training (v12) | `kaggle_mhipex_v12_cell1.py` + `cell2` + `cell3` | `mhipex_v12_results/` | ✅ Done |
-| RLAE optimization | `kaggle_mhipex_rlae.py` | `out_rlae/` | ✅ Done |
-| Ablation study | `kaggle_mhipex_ablations.py` | `ablation_results.csv` | ✅ Done |
-| Cross-dataset validation | `kaggle_mhipex_crossval.py` | `crossval_results.csv` | ✅ Done |
-| Entity-marker baseline (Soares) | `kaggle_mhipex_entity_marker_baseline.py` | `entity_marker_results.csv` | ✅ Done |
-| KG augmentation (single) | `kaggle_mhipex_kg.py` | `kg_results.csv` | ✅ Done |
-| Multi-KG (Wikidata/GeoNames/Getty) | `kaggle_mhipex_multikg.py` | `multi_kg_results.csv` | ✅ Done |
-| OCR noise robustness | `kaggle_mhipex_ocr_robustness.py` | `ocr_robustness_results.csv` | ✅ Done |
-
-### How to run any notebook
-1. Go to **Kaggle → New Notebook** (always use a fresh notebook)
-2. Settings: **GPU T4×2**, **Internet ON**
-3. Paste the entire `.py` file into **one cell**
-4. Run — it downloads data from GitHub automatically
-5. Download the CSV from the output directory
+**Best result:** MR = 0.5767 (95% CI: [0.548, 0.604])
 
 ---
 
-## 3. Paper Structure (main.tex, v24)
+## 2. All Experiments (Kaggle)
 
-| Section | Content | Key Tables/Figures |
-|---|---|---|
-| **1. Introduction** | RQ1–RQ5, contributions | — |
-| **2. Related Work** | 6 subsections: Historical NLP, RE with Transformers, Multilingual, KG/Gazetteers, Ensemble, Class Imbalance | — |
-| **3. Methodology** | Task, data, architecture, enrichment, model, training, calibration, ensemble, RLAE, Algorithm 1 | Tables 1–3, Figs 1–2 |
-| **4. Experimental Setup** | Hardware, reproducibility | — |
-| **5. Results** | Overall, Per-language, Baselines, Ablation, Loss, β sensitivity, RLAE, Generalization, Error analysis, KG | Tables 4–11, Figs 3–6 |
-| **6. Limitations & Future Work** | L1–L4, OCR experiment, E2–E6 | Table 12 |
-| **7. Conclusion** | Closes all RQs and hypotheses | — |
+| # | Experiment | Script | CSV | Status |
+|---|-----------|--------|-----|--------|
+| 1 | Main training (v12) | `kaggle_mhipex_v12_cell1-3.py` | `mhipex_v12_results/` | ✅ |
+| 2 | RLAE optimization | `kaggle_mhipex_rlae.py` | `out_rlae/` | ✅ |
+| 3 | Ablation (A0–A6) | `kaggle_mhipex_ablations.py` | `ablation_results.csv` | ✅ |
+| 4 | Cross-dataset | `kaggle_mhipex_crossval.py` | `crossval_results.csv` | ✅ |
+| 5 | Soares baseline | `kaggle_mhipex_entity_marker_baseline.py` | `entity_marker_results.csv` | ✅ |
+| 6 | KG (single) | `kaggle_mhipex_kg.py` | `kg_results.csv` | ✅ |
+| 7 | Multi-KG | `kaggle_mhipex_multikg.py` | `multi_kg_results.csv` | ✅ |
+| 8 | OCR robustness | `kaggle_mhipex_ocr_robustness.py` | `ocr_robustness_results.csv` | ✅ |
 
 ---
 
-## 4. All Issues — Final Audit (v24)
+## 3. Complete Issue Tracker (49 items — ALL fixed)
 
-### ✅ Fully Fixed
+### Comments.pdf Issues (Items 1–33)
 
-| # | Issue | Fix | Version |
-|---|---|---|---|
-| 1 | Table 3 MR arithmetic | Unrounded-arithmetic note in Table 4 caption | v16 |
-| 2 | Fig 3/4 redundancy | Old Fig 3 removed, new Fig 3 is per-language | v16 |
-| 3 | No CE/focal ablation | Table 7 added | v17 |
-| 4 | Ensemble unablated | Table 6: A5a vs A5b | v17 |
-| 5 | Soares baseline missing | Sec 5.3, Table 4 | v18 |
-| 6 | Thresholds unreported | Sec 3.8: τ_p=0.30, τ_t=0.25, τ_i=0.30 | v16 |
-| 7 | No GitHub/seeds/hardware | Sec 4.3 | v16 |
-| 8 | Devlin misattributed | Now cites soares2019 | v17 |
-| 9 | Focal loss misattributed | Points to Table 7 | v17 |
-| 10 | inoue2019 uncited | Cited at multi-sample dropout | v17 |
-| 11 | α/β notation clash | λ for pooling, β for ensemble | v16 |
-| 12 | Dev-set leakage | L1 in Sec 6 | v18 |
-| 13 | A2/A3 ΔMR=0 explained | Variance reduction ±0.008→±0.003 | v18 |
-| 14 | XLM-R hypothesis not closed | Flagged Sec 2.3, closed in Conclusion | v18 |
-| 15 | No variance/significance | Bootstrap CI + honest p-value | v18 |
-| 16 | No computational cost | Sec 4.3: 388M params, 70 min | v18 |
-| 17 | Calibration too thin | Concrete Berlin example | v22 |
-| 18 | KG experiment done | Table 11 with 3 sources + coverage | v19 |
-| 19 | OCR robustness done | Table 12 (R0–R3) | v20 |
-| 20 | velickovic2018 broken bibitem | Fixed `\bibitem` | v22 |
-| 21 | Keßler mojibake | `Ke{\ss}ler` | v22 |
-| 22 | Getty TGN anomaly undiscussed | Coverage threshold paragraph | v22 |
-| 23 | Class-weight formula unstated | $w_c = N/(C·n_c)$, clipped | v22 |
-| 24 | CIDOC-CRM not in Future Work | E5 added | v22 |
-| 25 | lyu2024 called "survey" | Now "Xu et al. demonstrate..." | v23 |
-| 26 | Sec 5.6 "+0.018" wrong | Corrected to +0.030 | v23 |
-| 27 | Sec 5.6 "XLM-R advantage on at" | Rewrote correctly | v23 |
-| 28 | "single-model" → "ensemble" | Fixed in Sec 5.7 | v23 |
-| 29 | Table 12 R0 ≠ Table 4 | Caption: "independent run" | v23 |
-| 30 | Table 9 at ≠ Table 4 RLAE | Per-language vs global calibration note | v23 |
-| 31 | Table 6 rounding mismatch | Caption explains rounding | v23 |
-| 32 | Algorithm 1 em-dash mojibake | Replaced with `---` | v23 |
-| 33 | Fig 1/2 embedded "Figure N" | Regenerated without titles | v23 |
-| 34 | **Abstract 4.4% → 4.3%** | Corrected: (0.5767−0.553)/0.553 = 4.28% ≈ 4.3% | **v24** |
-| 35 | **Running header "Title Suppressed"** | Added `\titlerunning{}` | **v24** |
-| 36 | **Acknowledgements contradiction** | "The first author thanks Dr. Sarika Jain for her guidance" | **v24** |
-| 37 | **Forward-dated reference [1]** | Added "(2026, to appear)" | **v24** |
-| 38 | **Table 7 MR gap (0.016)** | Caption: "20-epoch runs vs 30-max in Table 3" | **v24** |
-| 39 | **Tables 5/9/10/12 missing rounding note** | Added to all four captions | **v24** |
-| 40 | **Fig 3 English at 0.393→0.394** | Regenerated with correct value | **v24** |
-| 41 | **Fig 3/6 embedded "Figure N:" titles** | Regenerated without titles | **v24** |
-| 42 | **Line 2 comment mojibake** | Fixed | **v24** |
+| # | Issue | Status | Version |
+|---|-------|--------|---------|
+| 1 | Novelty incremental | ✅ Sec 3.10 pre-empts objection | v16 |
+| 2 | No CE/focal ablation | ✅ Table 7 | v17 |
+| 3 | Ensemble unablated | ✅ Table 6: A5a vs A5b | v17 |
+| 4 | Soares baseline missing | ✅ Sec 5.3 paragraph | v18 |
+| 5 | Table 3 arithmetic | ✅ Table 4 unrounded note | v16 |
+| 6 | Fig 3 stale numbers | ✅ Old Fig 3 removed | v16 |
+| 7 | Devlin misattributed | ✅ Now cites soares2019 | v17 |
+| 8 | Focal loss misattributed | ✅ Points to Table 7 | v17 |
+| 9 | inoue2019 uncited | ✅ Cited at Sec 3.6 | v17 |
+| 10 | α/β notation clash | ✅ λ for pooling, β for ensemble | v16 |
+| 11 | τ thresholds unreported | ✅ Sec 3.8 + Table 9 (per-language) | v16/v25 |
+| 12 | Dev-set leakage | ✅ L1 + L4 in Sec 6 | v18 |
+| 13 | A2/A3 ΔMR=0 unexplained | ✅ Variance reduction evidence | v18 |
+| 14 | XLM-R hypothesis unclosed | ✅ Flagged→tested→closed | v18 |
+| 15 | No variance/significance | ✅ Bootstrap CI + honest p-value | v18 |
+| 16 | No computational cost | ✅ Sec 4.3 | v18 |
+| 17 | Calibration explanation thin | ✅ Berlin worked example | v22 |
+| 18 | KG experiment | ✅ Table 11 (3 sources) | v19 |
+| 19 | OCR robustness | ✅ Table 12 (R0–R3) | v20 |
+| 20 | velickovic2018 broken | ✅ Fixed bibitem | v22 |
+| 21 | Keßler mojibake | ✅ `Ke{\ss}ler` | v22 |
+| 22 | Getty anomaly undiscussed | ✅ Coverage threshold paragraph | v22 |
+| 23 | Class-weight formula | ✅ $w_c = N/(C·n_c)$ | v22 |
+| 24 | CIDOC-CRM not in Future Work | ✅ E5 added | v22 |
+| 25 | GNN future work | ✅ E2 with GAT citation | v22 |
+| 26 | RAG future work | ✅ E3 with SPARQL design | v22 |
+| 27 | Joint NER+EL+RE | ✅ E4 | v22 |
+| 28 | HIPE-2027 | ✅ E6 | v22 |
+| 29 | Limitations not separate | ✅ Sec 6 with L1–L4 | v18 |
+| 30 | Calibration before motivation | ✅ Forward-ref to Table 2 | v18 |
+| 31 | Fig 3/4 redundancy | ✅ Removed duplicate | v16 |
+| 32 | Per-language gap stated 3× | ✅ Cross-referenced | v18 |
+| 33 | Seeds/hardware/runtime | ✅ All in Sec 4.3 | v16 |
 
-### ⚠️ Deferred (with justification)
+### Self-Review Fixes (Items 34–42, v22–v23)
+
+| # | Issue | Status | Version |
+|---|-------|--------|---------|
+| 34 | lyu2024 called "survey" | ✅ Now methods paper | v23 |
+| 35 | Sec 5.6 +0.018 wrong | ✅ Corrected to +0.030 | v23 |
+| 36 | Sec 5.6 "XLM-R advantage" | ✅ Rewrote correctly | v23 |
+| 37 | "single-model" → "ensemble" | ✅ "fixed-β ensemble" | v23 |
+| 38 | Table 12 R0 ≠ Table 4 | ✅ "independent run" | v23 |
+| 39 | Table 9 at ≠ Table 4 | ✅ Calibration note | v23 |
+| 40 | Table 6 rounding | ✅ Caption explains | v23 |
+| 41 | Algorithm 1 mojibake | ✅ `---` | v23 |
+| 42 | Fig 1/2 embedded titles | ✅ Regenerated | v23 |
+
+### v24 Fixes (Items 43–49)
+
+| # | Issue | Status | Version |
+|---|-------|--------|---------|
+| 43 | Abstract 4.4% → 4.3% | ✅ Corrected | v24 |
+| 44 | Running header "Title Suppressed" | ✅ `\titlerunning{}` | v24 |
+| 45 | Acknowledgements contradiction | ✅ Reworded | v24 |
+| 46 | Ref [1] forward-dated | ✅ "to appear" | v24 |
+| 47 | Table 7 MR gap (0.016) | ✅ Epoch difference explained | v24 |
+| 48 | Tables 5/9/10/12 rounding | ✅ Disclaimers added | v24 |
+| 49 | Fig 3/6 embedded titles | ✅ Regenerated | v24 |
+
+### v25 LLM Audit Fixes (Items 50–56)
+
+| # | Issue | Status | Version |
+|---|-------|--------|---------|
+| 50 | **Soares text claims numbers in Table 4** | ✅ Removed "Table 4 includes these results", reworded | **v25** |
+| 51 | **"strictly necessary" overclaim** (0.0012 < ±0.003 noise) | ✅ Changed to "directionally favored" with variance caveat | **v25** |
+| 52 | **β sweep claims 0.1 increments** but only shows 8 rows | ✅ Reworded: "eight representative values spanning the full range" | **v25** |
+| 53 | **β range claims 0.3–0.8** but lowest shown is 0.2 | ✅ Corrected to "0.2–0.8" | **v25** |
+| 54 | **RLAE τ thresholds never shown** (9 of 15 params hidden) | ✅ Table 9 expanded with τ columns per language per relation | **v25** |
+| 55 | **0.5525 vs 0.5530 discrepancy** (Fig 4 vs Table 4) | ✅ Table 4 footnote explains independent optimization gap | **v25** |
+| 56 | **VIAF + World Historical Gazetteer absent** | ✅ Added E7 to Future Work | **v25** |
+| 57 | **OCR experiment = augmentation, not contrastive** | ✅ Clarified in text, contrastive deferred to E2 | **v25** |
+
+---
+
+## 4. Deferred Items (with justification)
 
 | Item | Why | Where |
 |---|---|---|
-| LUKE/SpanBERT/ATLOP empirical comparison | Different task/metrics/domain — infeasible | Sec 5.3 paragraph |
-| Xu et al. empirical comparison | Same as above | Sec 5.3 |
-| Per-language section merge | Cross-referenced; restructuring breaks numbering | Acceptable |
-| Journal venue selection | Administrative decision for Dr. Jain | Not paper content |
-| OCR contrastive training | Basic noise-aug done; contrastive is separate contribution | Sec 6 E2 |
+| LUKE/SpanBERT/ATLOP comparison | Different task/metrics/domain | Sec 5.3 |
+| Xu et al. comparison | Same as above | Sec 5.3 |
+| Per-language + cross-dataset merge | Cross-referenced; not wrong | Acceptable |
+| Journal venue selection | Dr. Jain's decision | Not paper |
+| Contrastive OCR training | Separate contribution | E2 in Sec 6 |
+| DBpedia | Redundant with Wikidata | Covered by E7 note |
 
 ---
 
-## 5. Key Numerical Facts (for cross-checking)
+## 5. Numerical Cross-Check Table
 
-| What | Value | Source |
+| What | Value | Where |
 |---|---|---|
 | MHIPEX-RLAE MR | 0.5767 | Table 4 |
-| hmBERT calibrated MR | 0.553 | Table 4 |
-| XLM-R calibrated MR | 0.545 | Table 4 |
-| Fixed-β ensemble MR | 0.566 | Table 4 |
-| Relative improvement over mBERT | 35.1% | (0.5767−0.427)/0.427 |
-| Relative improvement over hmBERT | 4.3% | (0.5767−0.553)/0.553 |
+| hmBERT calibrated MR | 0.553 (unrounded: 0.5530) | Table 4 |
+| Ablation A4 MR | 0.553 (unrounded: 0.5525) | Table 6 + Fig 4 |
+| Gap 0.5530 vs 0.5525 | Explained in Table 4 footnote | ±0.0005 within noise |
+| Table 7 hmBERT MR | 0.5689 (20-epoch run) | Table 7 caption |
+| Table 12 R0 MR | 0.554 (independent run) | Table 12 caption |
 | Run-to-run variance | ±0.003 | Sec 4.3 |
 | Bootstrap CI | [0.548, 0.604] | Sec 5.1 |
-| Table 7 uses | 20 epochs (vs 30 max in Table 3) | Table 7 caption |
-| Table 12 R0 | Independent run (not Table 4 copy) | Table 12 caption |
-
----
-
-## 6. Design Decisions
-
-1. **Table 7 gap (0.016):** Caused by 20-epoch training vs 30-max-epoch main pipeline. Both are correct for their settings. Stated in caption.
-2. **Table 9 at recall gap (0.468 vs 0.474):** Per-language vs global threshold calibration. Explained in text.
-3. **Rounding disclaimers:** All 8 tables with numerical results now carry consistent rounding notes.
-4. **No embedded figure titles:** All 6 figures now rely purely on LaTeX `\caption{}` — no "Figure N:" burned into PNG. This is standard journal practice.
-5. **Acknowledgements:** "The first author thanks Dr. Sarika Jain for her guidance" — avoids co-author/supervisor contradiction.
-6. **Running header:** `\titlerunning{MHIPEX: Calibrated Ensemble for Historical RE}` — no more "Title Suppressed."
-
----
-
-## 7. File Map
-
-```
-MHIPEX/
-├── paper/
-│   ├── main.tex                    ← THE PAPER (v24)
-│   ├── compile_pdf.py              ← LaTeX compilation script
-│   └── figures/                    ← All chart images (no embedded titles)
-├── kaggle_mhipex_*.py              ← 8 Kaggle experiment scripts
-├── *_results.csv                   ← Result CSVs from experiments
-├── Comments.pdf                    ← Dr. Jain's review
-├── MHIPEX_Paper_Final_v24.pdf      ← CURRENT VERSION
-└── PROJECT_COMPLETE_STATUS.md      ← THIS FILE
-```
+| Relative over mBERT | 35.1% | Abstract |
+| Relative over hmBERT | 4.3% | Abstract + Conclusion |
