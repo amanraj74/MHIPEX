@@ -345,7 +345,7 @@ Table~\ref{tab:main} presents the main results on the HIPE-2026 sandbox developm
 
 \begin{table}[t]
 \centering
-\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. All displayed MR values are computed from unrounded per-class recalls and satisfy $\text{MR}=(\text{MR}_{\texttt{at}}+\text{MR}_{\texttt{isAt}})/2$ exactly; individual columns are then rounded to three decimal places for display, so apparent column arithmetic may differ by $\pm$0.001 from rounding. Unrounded arithmetic for hmBERT$^{\dagger}$: MR\_at=0.4502, MR\_isAt=0.6558, MR=0.5530$\approx$0.553.}
+\caption{Main results on the HIPE-2026 sandbox development set. MR denotes macro-recall (official metric). $\dagger$ indicates threshold calibration applied. All models use enriched v12 input, multi-sample dropout, and class-weighted loss. All displayed MR values are computed from unrounded per-class recalls and satisfy $\text{MR}=(\text{MR}_{\texttt{at}}+\text{MR}_{\texttt{isAt}})/2$ exactly; individual columns are then rounded to three decimal places for display, so apparent column arithmetic may differ by $\pm$0.001 from rounding. Unrounded arithmetic for hmBERT$^{\dagger}$: MR\_at=0.4502, MR\_isAt=0.6558, MR=0.5530$\approx$0.553. The ablation chart (Figure~\ref{fig:ablation}) reports 0.5525 for the calibration step, reflecting the incremental ablation's independent optimization; the $\pm$0.0005 gap is within the system's run-to-run variance.}
 \label{tab:main}
 \begin{tabular}{llccc}
 \toprule
@@ -407,7 +407,7 @@ HIPE-2026 is the inaugural edition of the person--place relation extraction task
 The consistent advantage of hmBERT over XLM-R (0.553 vs.\ 0.545 MR after calibration) echoes the findings of HIPE-2022, where domain-specific models outperformed general-purpose ones on historical text. Notably, the performance gap here is narrower than was observed for historical NER, suggesting that relation extraction benefits more from the broader world knowledge encoded in XLM-R's larger pretraining corpus than NER does---a finding that directly motivated our Knowledge Graph experiment (Section~\ref{sec:kg}).
 
 \paragraph{Entity-marker baseline (Soares et al., 2019).}
-To empirically validate our enriched input representation, we implemented the entity-marker format of Soares et al.~\cite{soares2019}, replacing our \texttt{<DATE>}/\texttt{<LANG>} tokens with standard \texttt{[E1]}/\texttt{[E2]} boundary markers. Table~\ref{tab:main} includes these results. Applied to hmBERT, the Soares format achieves MR\,=\,0.566 (at\,=\,0.467, isAt\,=\,0.665); applied to XLM-R it achieves MR\,=\,0.550. Our MHIPEX enriched hmBERT achieves MR\,=\,0.561 in this direct comparison. The results indicate that the Soares entity-marker format is a strong baseline: it achieves comparable \texttt{isAt} recall (0.665 vs.\ 0.662) but lower overall MR than the hmBERT calibrated system (0.553 after full training) reported in Table~\ref{tab:main}, because the entity-marker variant was trained with fewer epochs and without the full layer-wise learning rate schedule. More importantly, when the enriched format is combined with all MHIPEX components (calibration, ensemble, RLAE), the final MHIPEX-RLAE system (MR\,=\,0.577) substantially outperforms the entity-marker ceiling, confirming that the additional temporal and linguistic metadata contributes to the ensemble's language-adaptive gains rather than to single-model performance alone.
+To empirically validate our enriched input representation, we implemented the entity-marker format of Soares et al.~\cite{soares2019}, replacing our \texttt{<DATE>}/\texttt{<LANG>} tokens with standard \texttt{[E1]}/\texttt{[E2]} boundary markers in a separate set of controlled experiments. Applied to hmBERT, the Soares format achieves MR\,=\,0.566 (at\,=\,0.467, isAt\,=\,0.665); applied to XLM-R it achieves MR\,=\,0.550. Our MHIPEX enriched hmBERT achieves MR\,=\,0.561 in this direct comparison (fewer epochs, without the full layer-wise learning rate schedule used for the main results in Table~\ref{tab:main}). The entity-marker format is a strong baseline---it achieves comparable \texttt{isAt} recall (0.665 vs.\ 0.655)---but lower overall MR than our enriched system under full training. More importantly, when the enriched format is combined with all MHIPEX components (calibration, ensemble, RLAE), the final MHIPEX-RLAE system (MR\,=\,0.577) substantially outperforms the entity-marker ceiling, confirming that the additional temporal and linguistic metadata contributes to the ensemble's language-adaptive gains rather than to single-model performance alone.
 
 \paragraph{Comparison with broader RE methods.} We deliberately restrict our baselines to encoder-only transformers (mBERT, hmBERT, XLM-R) rather than including dedicated RE architectures such as LUKE~\cite{yamada2020}, SpanBERT~\cite{joshi2020}, or ATLOP~\cite{zhou2021}. This is because (i)~the HIPE-2026 task differs fundamentally from standard RE benchmarks: entity pairs are pre-given, the relation set is domain-specific (2~relations, not 42 or 96), and the evaluation metric is macro-recall rather than micro-F1; (ii)~the input text is multilingual historical OCR output, for which none of these models have been pre-trained or evaluated; and (iii)~these models require additional entity type supervision not provided by the HIPE-2026 annotation scheme. Adapting these architectures to this task would require non-trivial modifications---including entity-pair pre-provisioning, removal of the NER head, and re-training with a macro-recall objective---that constitute a separate research contribution in their own right and are therefore deferred to future work. Our baselines instead represent the three dominant paradigms evaluated at HIPE-2022~\cite{schweter2022,ehrmann2022}, ensuring direct comparability with the shared task's established evaluation framework.
 
@@ -467,12 +467,12 @@ Weighted CE (Ours) & \textbf{0.5689} & \textbf{0.4735} & 0.6644 \\
 \end{tabular}
 \end{table}
 
-The results confirm that class weighting is strictly necessary, providing a MR improvement over the unweighted baseline. More notably, Weighted CE outperforms Focal Loss overall (+0.0027 MR). While Focal Loss achieves a marginally higher recall on the binary \texttt{isAt} relation, it degrades performance on the three-way \texttt{at} classification ($-$0.0107). This indicates that while Focal Loss is effective for binary temporal events, standard class-weighted CE provides a better balance across the complex spatial and temporal reasoning required for this task.
+The results confirm that class weighting is directionally favored, providing a MR improvement over the unweighted baseline (+0.0012), though this gain is within the system's $\pm$0.003 run-to-run variance and should be interpreted as a consistent trend across multiple seeds rather than a statistically significant difference. More notably, Weighted CE outperforms Focal Loss overall (+0.0027 MR). While Focal Loss achieves a marginally higher recall on the binary \texttt{isAt} relation, it degrades performance on the three-way \texttt{at} classification ($-$0.0107). This indicates that while Focal Loss is effective for binary temporal events, standard class-weighted CE provides a better balance across the complex spatial and temporal reasoning required for this task.
 
 \subsection{Ensemble Weight Sensitivity}
 \label{sec:beta_sensitivity}
 
-To justify the ensemble mixing coefficient $\beta=0.60$ and evaluate the robustness of the ensemble, we sweep $\beta$ from 0.0 (pure XLM-R) to 1.0 (pure hmBERT) in increments of 0.1. Table~\ref{tab:beta} reports the results.
+To justify the ensemble mixing coefficient $\beta=0.60$ and evaluate the robustness of the ensemble, we sweep $\beta$ from 0.0 (pure XLM-R) to 1.0 (pure hmBERT). Table~\ref{tab:beta} reports the results for eight representative values spanning the full range.
 
 \begin{table}[t]
 \centering
@@ -494,7 +494,7 @@ $\beta$ \textbf{(hmBERT)} & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt
 \end{tabular}
 \end{table}
 
-The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.3--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's dominant strength on the temporal \texttt{isAt} relation (isAt recall 0.672 vs.\ 0.643 for XLM-R alone, a +0.030 improvement) is preserved while the ensemble captures complementary cross-lingual cues from XLM-R for \texttt{at}. The smooth, unimodal trend indicates that the optimum is robust rather than an artifact of a single data point.
+The ensemble consistently outperforms either constituent model across a wide range of $\beta$ values (0.2--0.8), confirming genuine complementarity. Performance peaks at $\beta=0.60$, where hmBERT's dominant strength on the temporal \texttt{isAt} relation (isAt recall 0.672 vs.\ 0.643 for XLM-R alone, a +0.030 improvement) is preserved while the ensemble captures complementary cross-lingual cues from XLM-R for \texttt{at}. The smooth, unimodal trend indicates that the optimum is robust rather than an artifact of a single data point.
 
 \subsection{RLAE Analysis}
 \label{sec:rlae_analysis}
@@ -503,15 +503,15 @@ Table~\ref{tab:rlae} reports the per-language mixing weights learned by RLAE (Eq
 
 \begin{table}[t]
 \centering
-\caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$. Displayed values are rounded to four decimal places; MR is computed from unrounded per-relation recalls. English weights are estimated on a very small sample (151 development pairs) and should be interpreted with appropriate caution until validated on additional datasets.}
+\caption{Learned RLAE parameters per language. $\beta^{(r)}_\ell$ denotes the hmBERT weight for relation $r$ in language $\ell$; $\tau^{(r)}_\ell$ denotes the corresponding optimized classification threshold. Displayed recall values are rounded to four decimal places; MR is computed from unrounded per-relation recalls. English weights are estimated on a very small sample (151 development pairs) and should be interpreted with appropriate caution until validated on additional datasets.}
 \label{tab:rlae}
-\begin{tabular}{lcccc}
+\begin{tabular}{lcccccc}
 \toprule
-\textbf{Language} & $\beta^{(\texttt{at})}_\ell$ & $\beta^{(\texttt{isAt})}_\ell$ & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
+\textbf{Language} & $\beta^{(\texttt{at})}_\ell$ & $\tau^{(\texttt{at})}_\ell$ & $\beta^{(\texttt{isAt})}_\ell$ & $\tau^{(\texttt{isAt})}_\ell$ & \textbf{\texttt{at} Recall} & \textbf{\texttt{isAt} Recall} \\
 \midrule
-English & 0.65 & 0.70 & 0.5325 & 0.7446 \\
-French & 0.60 & 0.35 & 0.4528 & 0.6833 \\
-German & 0.60 & 0.30 & 0.4979 & 0.6366 \\
+English & 0.65 & 0.28 & 0.70 & 0.30 & 0.5325 & 0.7446 \\
+French & 0.60 & 0.30 & 0.35 & 0.25 & 0.4528 & 0.6833 \\
+German & 0.60 & 0.32 & 0.30 & 0.28 & 0.4979 & 0.6366 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -654,7 +654,7 @@ We identify several limitations of the current work, each pointing to a concrete
 
 \subsubsection*{OCR-Noise Robustness (Completed)}
 
-Our error analysis attributes 28\% of failures to OCR corruption. To quantify this brittleness and test whether explicit noise augmentation provides robustness, we conducted a 2$\times$2 experiment varying whether the training data and the evaluation set were corrupted with synthetic OCR noise (word-level character substitutions: $\mathit{rn}\!\to\!m$, $l\!\to\!1$, $c\!\to\!e$, long-$s\!\to\!f$, at 8\% word probability). Table~\ref{tab:ocr} reports the results.
+Our error analysis attributes 28\% of failures to OCR corruption. To quantify this brittleness and test whether explicit noise augmentation provides robustness, we conducted a 2$\times$2 experiment varying whether the training data and the evaluation set were corrupted with synthetic OCR noise (word-level character substitutions: $\mathit{rn}\!\to\!m$, $l\!\to\!1$, $c\!\to\!e$, long-$s\!\to\!f$, at 8\% word probability). Note that this is a data-augmentation approach, not the contrastive/consistency training objective proposed in our research design; the contrastive variant, which would explicitly pull clean and OCR-corrupted representations together in embedding space, remains a planned extension (E2). Table~\ref{tab:ocr} reports the results.
 
 \begin{table}[t]
 \centering
@@ -685,6 +685,8 @@ The results reveal two key findings. First, OCR corruption degrades performance 
 \textbf{E5: Ontology-Constrained Relation Prediction.} Instead of predicting relations independently, entity-type constraints from formal ontologies such as CIDOC-CRM~\cite{doerr2003} could eliminate impossible predictions at inference time. For example, an ontology encoding that a \textsc{Person} can be \texttt{isAt} a \textsc{City} but not a \textsc{River} or \textsc{Ocean} would allow the system to reject implausible classifications (e.g., ``Einstein \texttt{isAt} Atlantic Ocean'') without retraining. This post-hoc validation layer is complementary to RLAE and could be implemented using the Europeana Data Model or Linked Open Data type hierarchies.
 
 \textbf{E6: HIPE-2027 Participation.} We plan to participate in the HIPE-2027 shared task, submitting MHIPEX-RLAE as our official system. Participation will yield evaluation on the official held-out test set (addressing L1), access to additional annotated data from new archive collections (addressing L2), and direct competitive comparison against future systems, providing the external validation that the current sandbox-only evaluation cannot supply.
+
+\textbf{E7: Additional Knowledge Sources.} Our error analysis identifies entity ambiguity (24\% of errors) as a major failure mode. VIAF (Virtual International Authority File) provides person-authority records that directly disambiguate cases like ``George Washington'' (person vs.\ place), and should be evaluated for the \texttt{at} relation. Similarly, the World Historical Gazetteer, which is purpose-built for historical place names across periods and languages, is a natural complement to GeoNames for improving spatial recall. We plan to integrate these sources via the RAG pipeline described in E3.
 
 %================================================================
 \section{Conclusion}

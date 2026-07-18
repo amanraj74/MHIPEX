@@ -1,114 +1,174 @@
-# MHIPEX — Multilingual Historical Person–Place Relation Extraction
+# MHIPEX
 
-**CLEF HIPE-2026 Shared Task Participation**  
-*Aman Jaiswal & Dr. Sarika Jain — NIT Kurukshetra*
+**Multilingual Historical Person–Place Relation Extraction**
+
+A calibrated transformer ensemble for extracting person–place relations from multilingual historical newspaper articles.  
+Built for the [CLEF HIPE-2026](https://hipe-eval.github.io/HIPE-2026/) shared task.
+
+> **Aman Jaiswal & Dr. Sarika Jain** — NIT Kurukshetra
 
 ---
 
-## Overview
+## The Task
 
-MHIPEX is a system for extracting person–place relations from multilingual historical newspaper articles, built for the [CLEF HIPE-2026](https://hipe-eval.github.io/HIPE-2026/) shared task. Given a (person, location) pair and the newspaper article containing both, MHIPEX classifies two relations:
+Given a newspaper article and a (person, location) pair, classify two relations:
 
-- **`at`**: Did this person have a geographical connection to this place? (FALSE / PROBABLE / TRUE)
-- **`isAt`**: Is this person at this place around publication time? (FALSE / TRUE)
+| Relation | Question | Classes |
+|----------|----------|---------|
+| **`at`** | Did this person have a geographical connection to this place? | FALSE · PROBABLE · TRUE |
+| **`isAt`** | Is this person at this place around publication time? | FALSE · TRUE |
 
-## Key Result
+**Languages:** English, French, German  
+**Evaluation metric:** Macro-recall (MR) across both relations
 
-| Metric | Score |
-|--------|-------|
-| **Macro-Recall (MR)** | **0.5655** |
-| `at` recall | 0.459 |
-| `isAt` recall | 0.672 |
-| Improvement over mBERT | +32.5% |
+---
+
+## Results
+
+| System | MR | `at` | `isAt` |
+|--------|-----|------|--------|
+| Majority class | 0.333 | 0.333 | 0.333 |
+| mBERT baseline | 0.427 | 0.354 | 0.500 |
+| hmBERT (calibrated) | 0.553 | 0.450 | 0.655 |
+| XLM-R (calibrated) | 0.545 | 0.447 | 0.643 |
+| Fixed ensemble (β=0.60) | 0.566 | 0.459 | 0.672 |
+| **MHIPEX-RLAE** | **0.577** | **0.474** | **0.679** |
+
+- **+35.1%** relative improvement over mBERT
+- **+4.3%** relative improvement over hmBERT alone
+- **95% CI:** [0.548, 0.604] via bootstrap (1,000 iterations)
+
+---
 
 ## Architecture
 
 ```
-Historical Newspaper Article
-        │
-        ▼
-  Input Enrichment (<P>, <L>, <DATE>, <LANG> tokens)
-        │
-   ┌────┴────┐
-   ▼         ▼
- hmBERT    XLM-R
- (110M)    (278M)
-   │         │
-   ▼         ▼
- CLS+Mean Pooling + Multi-Sample Dropout (K=3)
-   │         │
-   ▼         ▼
- Dual Heads (at: 3-class, isAt: 2-class)
-   │         │
-   └────┬────┘
-        ▼
-  Weighted Soft Voting (α=0.60)
-        ▼
-  Threshold Calibration
-        ▼
-  Final Predictions
+Newspaper Article + Entity Pair
+          │
+    Input Enrichment (<P>, <L>, <DATE>, <LANG> tokens)
+          │
+     ┌────┴────┐
+     ▼         ▼
+   hmBERT    XLM-R
+   (110M)    (278M)
+     │         │
+  CLS+Mean Pooling + Multi-Sample Dropout (K=3)
+     │         │
+  Dual Heads (at: 3-class, isAt: 2-class)
+     │         │
+     └────┬────┘
+          ▼
+    RLAE: Relation-Specific Language-Adaptive Ensemble
+    (per-relation, per-language β weights + τ thresholds)
+          ▼
+    Final Predictions
 ```
+
+**Key innovation:** RLAE learns independent mixing weights for each (relation × language) pair, capturing the finding that hmBERT dominates spatial `at` across all languages, while the optimal encoder for temporal `isAt` varies by language.
+
+---
+
+## Experiments
+
+All experiments run on Kaggle with T4×2 GPUs. Each script is **self-contained** — paste into a single notebook cell and run.
+
+| # | Experiment | Script | Output |
+|---|-----------|--------|--------|
+| 1 | Main training (v12) | `kaggle_mhipex_v12_cell1.py` → `cell2` → `cell3` | `mhipex_v12_results/` |
+| 2 | RLAE optimization | `kaggle_mhipex_rlae.py` | `out_rlae/` |
+| 3 | Ablation study (A0–A6) | `kaggle_mhipex_ablations.py` | `ablation_results.csv` |
+| 4 | Cross-dataset validation | `kaggle_mhipex_crossval.py` | `crossval_results.csv` |
+| 5 | Entity-marker baseline | `kaggle_mhipex_entity_marker_baseline.py` | `entity_marker_results.csv` |
+| 6 | KG augmentation (single) | `kaggle_mhipex_kg.py` | `kg_results.csv` |
+| 7 | Multi-KG (Wikidata/GeoNames/Getty) | `kaggle_mhipex_multikg.py` | `multi_kg_results.csv` |
+| 8 | OCR noise robustness | `kaggle_mhipex_ocr_robustness.py` | `ocr_robustness_results.csv` |
+
+### Running a notebook
+
+1. Open **Kaggle → New Notebook**
+2. Set **Accelerator: GPU T4×2**, **Internet: ON**
+3. Paste the entire `.py` file into one cell
+4. Run — data downloads automatically from GitHub
+
+---
 
 ## Project Structure
 
 ```
 MHIPEX/
-├── data/raw/hipe2026/          # HIPE-2026 datasets (sandbox + newspaper v1.0)
-├── kaggle_mhipex_v12_cell1.py  # Training pipeline: setup + model + training loop
-├── kaggle_mhipex_v12_cell2.py  # Training pipeline: experiment runner
-├── kaggle_mhipex_v12_cell3.py  # Training pipeline: ensemble + calibration
-├── kaggle_mhipex_crossval.py   # Cross-dataset validation experiments
-├── notebooks/01_results_analysis.py  # Publication-quality analysis figures
 ├── paper/
-│   ├── main.tex                # Research paper (LNCS format)
-│   ├── figures/                # Generated figures and architecture diagram
-│   └── MHIPEX_Paper_Draft.pdf  # Compiled paper
-├── results/                    # Experiment outputs and result tables
-├── PRODUCT.md                  # Full technical documentation (Project Bible)
-├── RESEARCH_ROADMAP.md         # Future research directions
-├── PROJECT_STATUS.md           # Current status tracker
-└── NEXT_STEPS.md               # Immediate action items
+│   ├── main.tex                          # Paper source (LNCS format)
+│   ├── compile_pdf.py                    # LaTeX → PDF compilation
+│   └── figures/                          # All charts (no embedded titles)
+│
+├── kaggle_mhipex_v12_cell1.py            # Training: setup + model
+├── kaggle_mhipex_v12_cell2.py            # Training: experiment runner
+├── kaggle_mhipex_v12_cell3.py            # Training: ensemble + calibration
+├── kaggle_mhipex_rlae.py                 # RLAE weight optimization
+├── kaggle_mhipex_ablations.py            # Ablation study
+├── kaggle_mhipex_crossval.py             # Cross-dataset validation
+├── kaggle_mhipex_entity_marker_baseline.py  # Soares baseline
+├── kaggle_mhipex_kg.py                   # Single KG experiment
+├── kaggle_mhipex_multikg.py              # Multi-KG comparison
+├── kaggle_mhipex_ocr_robustness.py       # OCR noise experiment
+│
+├── data/raw/hipe2026/                    # HIPE-2026 datasets
+├── *_results.csv                         # Experiment outputs
+├── Comments.pdf                          # Supervisor review
+├── PROJECT_COMPLETE_STATUS.md            # Full audit trail
+├── MHIPEX_Paper_Final_v25.pdf            # Current paper
+└── README.md                             # This file
 ```
 
-## Quick Start
+---
 
-### Requirements
+## Requirements
+
 - Python 3.10+
-- PyTorch 2.x
+- PyTorch 2.x with CUDA
 - Transformers 4.44.2
-- CUDA-capable GPU (T4 or better)
+- GPU: NVIDIA T4 or better (16 GB VRAM)
 
-### Training
-All training is done on Kaggle. Copy the cell files into a Kaggle notebook with GPU T4 x2:
-```
-Cell 1: kaggle_mhipex_v12_cell1.py  (Setup + Model + Data)
-Cell 2: kaggle_mhipex_v12_cell2.py  (Training Runner)
-Cell 3: kaggle_mhipex_v12_cell3.py  (Ensemble + Calibration)
-```
+---
 
-### Cross-Dataset Validation
-```
-Single cell: kaggle_mhipex_crossval.py (~40 min on T4 x2)
-```
+## Paper
 
-## Documentation
+**Title:** MHIPEX: A Calibrated Transformer Ensemble for Multilingual Person–Place Relation Extraction in Historical Newspapers
 
-| Document | Purpose |
-|----------|---------|
-| `PRODUCT.md` | Complete technical documentation — the Project Bible |
-| `RESEARCH_ROADMAP.md` | Future research directions (3 levels) |
-| `PROJECT_STATUS.md` | Current status of all deliverables |
-| `NEXT_STEPS.md` | Immediate action items |
-| `paper/main.tex` | Research paper (LNCS format) |
+**Tables in the paper:**
+
+| Table | Content |
+|-------|---------|
+| 1 | Dataset statistics |
+| 2 | Label distribution |
+| 3 | Hyperparameters |
+| 4 | Main results |
+| 5 | Per-language breakdown |
+| 6 | Ablation study (A0–A6) |
+| 7 | Loss function comparison (CE vs Focal) |
+| 8 | β sensitivity sweep |
+| 9 | RLAE weights + thresholds per language |
+| 10 | Cross-dataset & zero-shot transfer |
+| 11 | Knowledge Graph augmentation |
+| 12 | OCR noise robustness |
+
+---
 
 ## Citation
 
-```
-Jaiswal, A. and Jain, S. (2026). MHIPEX: An Enriched Transformer Ensemble
-for Person–Place Relation Extraction from Multilingual Historical Newspapers.
-In: CLEF 2026 Working Notes. CEUR-WS.
+```bibtex
+@inproceedings{jaiswal2026mhipex,
+  title     = {MHIPEX: A Calibrated Transformer Ensemble for Multilingual
+               Person--Place Relation Extraction in Historical Newspapers},
+  author    = {Jaiswal, Aman and Jain, Sarika},
+  booktitle = {Working Notes of CLEF 2026},
+  publisher = {CEUR-WS},
+  year      = {2026}
+}
 ```
 
-## Supervisor
+---
 
-**Dr. Sarika Jain** — Department of Computer Engineering, NIT Kurukshetra
+## License
+
+This project is for academic research purposes. Please cite our paper if you use any part of this work.
