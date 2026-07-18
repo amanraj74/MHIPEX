@@ -1,8 +1,8 @@
-# MHIPEX — Complete Project Status (v25)
+# MHIPEX — Complete Project Status (v26)
 
 > **Last updated:** 2026-07-18  
-> **Version:** v25 (camera-ready)  
-> **PDF:** `MHIPEX_Paper_Final_v25.pdf` (2123 KB)  
+> **Version:** v26 (journal-ready)  
+> **PDF:** `MHIPEX_Paper_Final_v26.pdf` (2700 KB)  
 > **GitHub:** https://github.com/amanraj74/MHIPEX
 
 ---
@@ -113,13 +113,23 @@
 
 ---
 
+### v26 Final Journal Prep Fixes (Items 58–63)
+
+| # | Issue | Status | Version |
+|---|-------|--------|---------|
+| 58 | **Fig 1–6 look like matplotlib defaults** | ✅ Regenerated as publication-grade (Elsevier/IEEE) diagrams | **v26** |
+| 59 | **Section 5.3 out of scope justification** | ✅ Re-worded for ATLOP/Xu et al. and marked as planned future work | **v26** |
+| 60 | **VIAF and WHG missing from Rel. Work** | ✅ Added to Sec 2.4 | **v26** |
+| 61 | **Merge Per-Language / Cross-dataset** | ✅ Merged into unified Section 5.8 'Generalization' | **v26** |
+| 62 | **LNCS template limitations** | ✅ Converted to generic `article` class with standard IMRaD format | **v26** |
+| 63 | **Reviewing numbers across text/tables** | ✅ Verified all numbers match consistently | **v26** |
+
+---
+
 ## 4. Deferred Items (with justification)
 
 | Item | Why | Where |
 |---|---|---|
-| LUKE/SpanBERT/ATLOP comparison | Different task/metrics/domain | Sec 5.3 |
-| Xu et al. comparison | Same as above | Sec 5.3 |
-| Per-language + cross-dataset merge | Cross-referenced; not wrong | Acceptable |
 | Journal venue selection | Dr. Jain's decision | Not paper |
 | Contrastive OCR training | Separate contribution | E2 in Sec 6 |
 | DBpedia | Redundant with Wikidata | Covered by E7 note |

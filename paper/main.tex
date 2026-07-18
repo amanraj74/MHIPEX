@@ -1,6 +1,6 @@
 % MHIPEX: Multilingual Historical Person-Place Relation Extraction
-% CLEF 2026 Working Notes --- LNCS Format
-\documentclass[runningheads]{llncs}
+% Generic Journal Format
+\documentclass[11pt,a4paper]{article}
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{booktabs}
@@ -8,23 +8,25 @@
 \usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{authblk}
 
 \begin{document}
 
 \title{MHIPEX: A Calibrated Transformer Ensemble for\\Multilingual Person--Place Relation Extraction\\in Historical Newspapers}
-\titlerunning{MHIPEX: Calibrated Ensemble for Historical RE}
 
-\author{Aman Jaiswal \and Sarika Jain}
-\authorrunning{Jaiswal and Jain}
-\institute{National Institute of Technology Kurukshetra, India}
+\author{Aman Jaiswal}
+\author{Sarika Jain}
+\affil{National Institute of Technology Kurukshetra, India}
+\date{}
 
 \maketitle
 
 \begin{abstract}
-This paper presents MHIPEX, a general knowledge-aware framework for person--place relation extraction from multilingual historical newspapers. Evaluated in the context of the CLEF HIPE-2026 shared task, MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy between KG sources: GeoNames maximises spatial recall (\texttt{at} recall +1.2\,pp over text-only) while Wikidata yields the strongest overall MR gain (+0.002 MR), yet every KG source degrades temporal event detection (\texttt{isAt} recall $-$2.0\,pp for GeoNames), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline (+4.3\% relative over hmBERT alone) and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields a macro-recall of 0.588, confirming the robustness of the framework for broader multilingual historical relation extraction tasks.
+This paper presents MHIPEX, a general knowledge-aware framework for person--place relation extraction from multilingual historical newspapers. Evaluated in the context of the CLEF HIPE-2026 shared task, MHIPEX introduces a Relation-Specific Language-Adaptive Ensemble (RLAE) that learns independent mixing weights for each relation type (spatial \texttt{at} vs.\ temporal \texttt{isAt}) and each source language, motivated by the empirical observation that the relative strengths of historically pre-trained BERT (hmBERT) and XLM-RoBERTa differ across both dimensions. RLAE is combined with enriched input representations, multi-sample dropout with dual pooling, class-weighted training, and post-hoc threshold calibration. A Knowledge Graph augmentation experiment reveals a fundamental dichotomy between KG sources: GeoNames maximises spatial recall (\texttt{at} recall +1.2\,pp over text-only) while Wikidata yields the strongest overall MR gain (+0.002 MR), yet every KG source degrades temporal event detection (\texttt{isAt} recall $-$2.0\,pp for GeoNames), directly motivating the decoupled RLAE design. On the HIPE-2026 sandbox development data, MHIPEX with RLAE achieves a macro-recall of 0.5767 (95\% CI: [0.548, 0.604]), a +35.1\% relative improvement over a vanilla mBERT baseline (+4.3\% relative over hmBERT alone) and +0.011 MR over the fixed-weight ensemble. Cross-dataset validation on newspaper v1.0 yields a macro-recall of 0.588, confirming the robustness of the framework for broader multilingual historical relation extraction tasks.\\
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} Historical NLP, Relation Extraction, Multilingual Transformers, Knowledge Graphs, CLEF HIPE-2026
 \end{abstract}
-
-\keywords{Historical NLP \and Relation Extraction \and Multilingual Transformers \and Knowledge Graphs \and CLEF HIPE-2026}
 
 %================================================================
 \section{Introduction}
@@ -91,9 +93,9 @@ A persistent question in multilingual NLP is whether domain-specific models outp
 
 \subsection{Knowledge Graphs and Digital Humanities Gazetteers}
 
-Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies, historical name variants) and the Getty Thesaurus of Geographic Names~(TGN; historical and multilingual place name coverage) are highly relevant but rarely integrated into NER or RE pipelines for historical documents.
+Exploiting structured knowledge resources for information extraction from historical texts remains underexplored. Wikidata, with its structured biographical properties (P19 birthplace, P20 deathplace, P551 residence, P27 country of citizenship), provides a natural source of person--place facts that could directly inform relation classification. For geographical disambiguation, resources such as GeoNames (alternate spellings, administrative hierarchies) and the Getty Thesaurus of Geographic Names~(TGN; multilingual place name coverage) are highly relevant. Furthermore, the World Historical Gazetteer (WHG) offers purpose-built temporal scoping for historical place names that shift across centuries, while the Virtual International Authority File (VIAF) provides person-authority records critical for resolving entity ambiguity (e.g., distinguishing ``George Washington'' the person from the place)---a failure mode that accounts for 24\% of all errors in our system (Section~\ref{sec:error}).
 
-In the digital humanities community, the Pelagios/Recogito initiative~\cite{simon2017} has developed linked-open-data infrastructure specifically for historical place annotation in digitized texts, directly aligned with the challenges of the HIPE-2026 task. Similarly, the CIDOC Conceptual Reference Model (CIDOC-CRM) provides a formal ontology for cultural heritage that could constrain relation predictions based on entity type compatibility (e.g., ruling out implausible person--location associations). Despite their relevance, none of these resources have been systematically integrated into transformer-based relation extraction for historical newspapers. Our Knowledge Graph experiment (Section~\ref{sec:kg}) takes a first step in this direction.
+In the digital humanities community, the Pelagios/Recogito initiative~\cite{simon2017} has developed linked-open-data infrastructure specifically for historical place annotation in digitized texts, directly aligned with the challenges of the HIPE-2026 task. Similarly, the CIDOC Conceptual Reference Model (CIDOC-CRM) provides a formal ontology for cultural heritage that could constrain relation predictions based on entity type compatibility (e.g., ruling out implausible person--location associations). Despite their relevance, none of these resources have been systematically integrated into transformer-based relation extraction for historical newspapers. Our Knowledge Graph experiment (Section~\ref{sec:kg}) takes a first step in this direction by integrating Wikidata, GeoNames, and TGN.
 
 \subsection{Ensemble Methods in NLP}
 
@@ -369,36 +371,7 @@ Several observations merit discussion. First, mBERT barely exceeds the majority 
 
 \textbf{Statistical significance.} Bootstrap resampling (1{,}000 iterations) yields a 95\% confidence interval of $[0.548, 0.604]$ for MHIPEX-RLAE, compared to $[0.524, 0.581]$ for the hmBERT baseline. The RLAE system outperforms the baseline in 86.1\% of bootstrap samples, indicating a strong positive trend, though the improvement does not reach strict significance at $p<0.05$ due to the moderate development set size ($n=2{,}081$).
 
-\subsection{Per-Language Analysis}
-\label{sec:lang}
 
-Table~\ref{tab:lang} disaggregates performance by language.
-
-\begin{table}[t]
-\centering
-\caption{Per-language performance of the MHIPEX fixed-$\beta$ ensemble ($\beta=0.60$). RLAE per-language weights are reported separately in Table~\ref{tab:rlae}. Displayed values are rounded to three decimal places; MR is computed from unrounded per-relation recalls.}
-\label{tab:lang}
-\begin{tabular}{lrccc}
-\toprule
-\textbf{Language} & $n$ & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
-\midrule
-English & 151 & 0.543 & 0.394 & 0.692 \\
-French & 1{,}498 & 0.568 & 0.449 & 0.686 \\
-German & 432 & 0.542 & 0.486 & 0.599 \\
-\midrule
-All & 2{,}081 & 0.566 & 0.459 & 0.672 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-French achieves the highest overall MR (0.568), which is expected given that it dominates the training set (72\% of pairs). English, despite having the smallest sample ($n=151$), achieves competitive performance, likely because hmBERT's English pre-training data is relatively clean compared to its French and German historical corpora. German presents an interesting case: it achieves the highest \texttt{at} recall (0.486) but the lowest \texttt{isAt} recall (0.599), as visualized in Figure~\ref{fig:lang}. We hypothesize that German newspaper articles from this period tend to provide more explicit geographical descriptions (aiding \texttt{at} classification) but use more ambiguous temporal constructions (hindering \texttt{isAt}). These language-specific patterns motivate the out-of-distribution experiments in Section~\ref{sec:crossval}, where we test whether German's \texttt{isAt} weakness persists under zero-shot transfer.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.85\textwidth]{figures/fig3_per_language.png}
-\caption{Per-language breakdown of the MHIPEX ensemble. German achieves the highest \texttt{at} recall but the lowest \texttt{isAt} recall, suggesting language-specific temporal reasoning challenges.}
-\label{fig:lang}
-\end{figure}
 
 \subsection{Positioning Against Prior Work}
 
@@ -409,7 +382,7 @@ The consistent advantage of hmBERT over XLM-R (0.553 vs.\ 0.545 MR after calibra
 \paragraph{Entity-marker baseline (Soares et al., 2019).}
 To empirically validate our enriched input representation, we implemented the entity-marker format of Soares et al.~\cite{soares2019}, replacing our \texttt{<DATE>}/\texttt{<LANG>} tokens with standard \texttt{[E1]}/\texttt{[E2]} boundary markers in a separate set of controlled experiments. Applied to hmBERT, the Soares format achieves MR\,=\,0.566 (at\,=\,0.467, isAt\,=\,0.665); applied to XLM-R it achieves MR\,=\,0.550. Our MHIPEX enriched hmBERT achieves MR\,=\,0.561 in this direct comparison (fewer epochs, without the full layer-wise learning rate schedule used for the main results in Table~\ref{tab:main}). The entity-marker format is a strong baseline---it achieves comparable \texttt{isAt} recall (0.665 vs.\ 0.655)---but lower overall MR than our enriched system under full training. More importantly, when the enriched format is combined with all MHIPEX components (calibration, ensemble, RLAE), the final MHIPEX-RLAE system (MR\,=\,0.577) substantially outperforms the entity-marker ceiling, confirming that the additional temporal and linguistic metadata contributes to the ensemble's language-adaptive gains rather than to single-model performance alone.
 
-\paragraph{Comparison with broader RE methods.} We deliberately restrict our baselines to encoder-only transformers (mBERT, hmBERT, XLM-R) rather than including dedicated RE architectures such as LUKE~\cite{yamada2020}, SpanBERT~\cite{joshi2020}, or ATLOP~\cite{zhou2021}. This is because (i)~the HIPE-2026 task differs fundamentally from standard RE benchmarks: entity pairs are pre-given, the relation set is domain-specific (2~relations, not 42 or 96), and the evaluation metric is macro-recall rather than micro-F1; (ii)~the input text is multilingual historical OCR output, for which none of these models have been pre-trained or evaluated; and (iii)~these models require additional entity type supervision not provided by the HIPE-2026 annotation scheme. Adapting these architectures to this task would require non-trivial modifications---including entity-pair pre-provisioning, removal of the NER head, and re-training with a macro-recall objective---that constitute a separate research contribution in their own right and are therefore deferred to future work. Our baselines instead represent the three dominant paradigms evaluated at HIPE-2022~\cite{schweter2022,ehrmann2022}, ensuring direct comparability with the shared task's established evaluation framework.
+\paragraph{Comparison with broader RE methods.} We deliberately restrict our baselines to encoder-only transformers (mBERT, hmBERT, XLM-R) rather than including dedicated document-level RE architectures such as ATLOP~\cite{zhou2021} or the cross-sentence reasoning frameworks of Xu et al.~\cite{lyu2024}. Adapting these models to the HIPE-2026 task requires overcoming substantial structural mismatch: our entity pairs are pre-provisioned (bypassing the coreference and NER stages these models rely on), the relation set is highly constrained (2 relations vs.\ DocRED's 96), and the text is OCR-corrupted historical multilingual data rather than modern English. Consequently, adapting document-level graph models requires non-trivial architectural modifications including removal of NER heads and re-training with a macro-recall objective. While out of scope for the current baseline establishment, we explicitly flag the adaptation of ATLOP and Xu et al. as a planned follow-up experiment to evaluate whether cross-sentence dependency tracking can resolve the remaining \textsc{probable} spatial ambiguities. Our current baselines instead represent the three dominant paradigms evaluated at HIPE-2022~\cite{schweter2022,ehrmann2022}, ensuring direct comparability with the shared task's established framework.
 
 \subsection{Ablation Study}
 \label{sec:ablation}
@@ -522,12 +495,46 @@ Note that the per-language recalls in Table~\ref{tab:rlae} are computed on disjo
 
 This relation--language interaction is precisely the pattern that a fixed global $\beta$ cannot capture, and it explains the +0.011 MR gain of RLAE over the fixed ensemble.
 
-\subsection{Generalization Analysis}
+\subsection{Generalization}
+\label{sec:generalization}
+
+A key concern with any supervised system is whether it generalizes beyond the specific data distribution on which it was trained. We analyze generalization along three axes: performance across different training languages, cross-domain transfer across data sources, and zero-shot cross-lingual transfer.
+
+\subsubsection{Per-Language Performance}
+\label{sec:lang}
+
+Table~\ref{tab:lang} disaggregates performance by language.
+
+\begin{table}[t]
+\centering
+\caption{Per-language performance of the MHIPEX fixed-$\beta$ ensemble ($\beta=0.60$). RLAE per-language weights are reported separately in Table~\ref{tab:rlae}. Displayed values are rounded to three decimal places; MR is computed from unrounded per-relation recalls.}
+\label{tab:lang}
+\begin{tabular}{lrccc}
+\toprule
+\textbf{Language} & $n$ & \textbf{MR} & \textbf{\texttt{at}} & \textbf{\texttt{isAt}} \\
+\midrule
+English & 151 & 0.543 & 0.394 & 0.692 \\
+French & 1{,}498 & 0.568 & 0.449 & 0.686 \\
+German & 432 & 0.542 & 0.486 & 0.599 \\
+\midrule
+All & 2{,}081 & 0.566 & 0.459 & 0.672 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+French achieves the highest overall MR (0.568), which is expected given that it dominates the training set (72\% of pairs). English, despite having the smallest sample ($n=151$), achieves competitive performance, likely because hmBERT's English pre-training data is relatively clean compared to its French and German historical corpora. German presents an interesting case: it achieves the highest \texttt{at} recall (0.486) but the lowest \texttt{isAt} recall (0.599), as visualized in Figure~\ref{fig:lang}. We hypothesize that German newspaper articles from this period tend to provide more explicit geographical descriptions (aiding \texttt{at} classification) but use more ambiguous temporal constructions (hindering \texttt{isAt}). These language-specific patterns motivate the out-of-distribution experiments below, where we test whether German's \texttt{isAt} weakness persists under zero-shot transfer.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig3_per_language.png}
+\caption{Per-language breakdown of the MHIPEX ensemble. German achieves the highest \texttt{at} recall but the lowest \texttt{isAt} recall, suggesting language-specific temporal reasoning challenges.}
+\label{fig:lang}
+\end{figure}
+
+\subsubsection{Cross-Dataset and Zero-Shot Transfer}
 \label{sec:crossval}
 
-The language-specific performance patterns observed in Section~\ref{sec:lang}---notably German's strong \texttt{at} recall but weak \texttt{isAt} recall, and English's competitive overall MR despite its small sample size---motivate examining whether these tendencies persist in out-of-distribution settings.
-
-A key concern with any supervised system is whether it generalizes beyond the specific data distribution on which it was trained. We conduct three types of generalization experiments using hmBERT (our strongest single model): \emph{in-domain}, \emph{cross-domain} transfer across data sources, and \emph{zero-shot cross-lingual} transfer across languages.
+The language-specific performance patterns observed above motivate examining whether these tendencies persist in out-of-distribution settings. We conduct three types of generalization experiments using hmBERT (our strongest single model): \emph{in-domain}, \emph{cross-domain} transfer across data sources, and \emph{zero-shot cross-lingual} transfer across languages.
 
 \subsubsection{In-Domain Generalization}
 The reference performance is established by training on the standard HIPE-2026 sandbox training set and evaluating on the corresponding sandbox development set.
