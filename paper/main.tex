@@ -553,7 +553,7 @@ We conduct leave-one-language-out experiments: training on two languages and eva
 
 \begin{table}[t]
 \centering
-\caption{Cross-dataset and cross-lingual validation results using hmBERT with enriched v12 input. ``Reference'' denotes the standard sandbox train/dev setting. All displayed MR values satisfy $\text{MR}=(\text{MR}_{\texttt{at}}+\text{MR}_{\texttt{isAt}})/2$ exactly on their unrounded values; apparent column-arithmetic discrepancies of $\pm$0.001 are standard rounding artifacts.}
+\caption{Cross-dataset and cross-lingual validation results using hmBERT with enriched v12 input. ``Reference'' denotes the standard sandbox train/dev setting. To accommodate the computational cost of running four complete training cycles, the cross-validation models were trained under a compressed schedule (20 epochs, patience 5) compared to the main experiments (30 epochs, patience 8). All displayed MR values satisfy $\text{MR}=(\text{MR}_{\texttt{at}}+\text{MR}_{\texttt{isAt}})/2$ exactly on their unrounded values; apparent column-arithmetic discrepancies of $\pm$0.001 are standard rounding artifacts.}
 \label{tab:crossval}
 \begin{tabular}{llccc}
 \toprule
