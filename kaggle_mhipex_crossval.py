@@ -427,7 +427,7 @@ print(f"  {'Experiment':<30} {'MR':>6} {'at':>6} {'isAt':>6}")
 print("  " + "─"*54)
 
 # Add reference: full sandbox training result
-print(f"  {'Ref: Full sandbox (hmBERT)':<30} {'0.553':>6} {'0.450':>6} {'0.655':>6}")
+print(f"  {'Ref: Full sandbox (hmBERT)':<30} {'0.546':>6} {'0.445':>6} {'0.648':>6}")
 print("  " + "─"*54)
 
 for r in results:
@@ -445,7 +445,7 @@ print(f"\n✅ Results saved to {results_file}")
 csv_file = OUT_DIR / "crossval_results.csv"
 with open(csv_file, "w") as f:
     f.write("Experiment,Train,Test,MR,at_recall,isAt_recall\n")
-    f.write("Reference,Sandbox (EN+FR+DE),Sandbox dev,0.5525,0.4503,0.6548\n")
+    f.write("Reference,Sandbox (EN+FR+DE),Sandbox dev,0.5463,0.4448,0.6478\n")
     for r in results:
         exp = r['experiment']
         if 'Newspaper' in exp:
